@@ -327,6 +327,7 @@ Guidelines:
 - Mention specific risks for the business
 - Keep language conversational and easy to follow
 - Include exact current price and 52-week comparison
+- IMPORTANT: Keep total response under 1500 characters including all formatting and symbols
 `;
 
     const completion = await openai.chat.completions.create({
@@ -426,6 +427,7 @@ Guidelines:
 - Mention specific business risks and opportunities
 - Include exact current price and 52-week range analysis
 - Use "crores" for Indian market cap and revenue figures
+- IMPORTANT: Keep total response under 1500 characters including all formatting and symbols
 `;
 
     const completion = await openai.chat.completions.create({

@@ -206,22 +206,61 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
   }
 }
 
-// Send WhatsApp message via Twilio
+// Send WhatsApp message via Twilio with fallback splitting
 async function sendWhatsAppMessage(messageText, toNumber) {
   try {
     console.log(
       `📤 Sending to ${toNumber}:`,
       messageText.substring(0, 50) + '...'
     );
+    console.log(`📏 Message length: ${messageText.length} characters`);
 
-    const message = await twilioClient.messages.create({
-      body: messageText,
-      from: TWILIO_WHATSAPP_NUMBER,
-      to: toNumber,
-    });
+    const MAX_LENGTH = 1500; // WhatsApp limit with buffer
 
-    console.log('✅ Message sent successfully:', message.sid);
-    return message;
+    // Try to send as single message first
+    if (messageText.length <= MAX_LENGTH) {
+      const message = await twilioClient.messages.create({
+        body: messageText,
+        from: TWILIO_WHATSAPP_NUMBER,
+        to: toNumber,
+      });
+
+      console.log('✅ Message sent successfully (single):', message.sid);
+      return message;
+    }
+
+    // Fallback: AI didn't respect character limit, split intelligently
+    console.log(`⚠️ Message over limit (${messageText.length} chars), using fallback splitting...`);
+
+    const parts = splitMessageIntelligently(messageText, MAX_LENGTH);
+
+    console.log(`📤 Sending ${parts.length} parts to ${toNumber}`);
+
+    // Send each part with small delay to ensure order
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const partHeader = parts.length > 1 ? `(${i + 1}/${parts.length}) ` : '';
+      const messageToSend = partHeader + part;
+
+      console.log(`📤 Sending part ${i + 1}/${parts.length} (${messageToSend.length} chars)`);
+
+      const message = await twilioClient.messages.create({
+        body: messageToSend,
+        from: TWILIO_WHATSAPP_NUMBER,
+        to: toNumber,
+      });
+
+      console.log(`✅ Part ${i + 1} sent successfully:`, message.sid);
+
+      // Small delay between messages
+      if (i < parts.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    console.log(`✅ All ${parts.length} parts sent successfully (fallback splitting used)`);
+    return { success: true, parts: parts.length };
+
   } catch (error) {
     console.error('❌ Error sending WhatsApp message:', error);
     console.error('Error details:', {
@@ -231,6 +270,50 @@ async function sendWhatsAppMessage(messageText, toNumber) {
     });
     return null;
   }
+}
+
+// Intelligently split message at natural break points
+function splitMessageIntelligently(text, maxLength) {
+  const parts = [];
+  let remaining = text;
+
+  while (remaining.length > maxLength) {
+    let splitIndex = maxLength;
+
+    // Try to find good break points in order of preference
+    const breakPoints = [
+      '\n\n---\n\n',  // Between different stocks
+      '\n\n',         // Between major sections
+      '\n*',          // Before bullet points
+      '\n',           // Any line break
+      '. ',           // End of sentence
+      ', ',           // After comma
+      ' '             // Any space as last resort
+    ];
+
+    // Find the best break point within the limit
+    for (const breakPoint of breakPoints) {
+      const lastBreakIndex = remaining.lastIndexOf(breakPoint, maxLength);
+      if (lastBreakIndex > maxLength * 0.7) { // Don't split too early (70% minimum)
+        splitIndex = lastBreakIndex + breakPoint.length;
+        break;
+      }
+    }
+
+    // Extract this part and clean it up
+    const part = remaining.substring(0, splitIndex).trim();
+    parts.push(part);
+
+    // Remove this part from remaining text
+    remaining = remaining.substring(splitIndex).trim();
+  }
+
+  // Add the final part if any remaining
+  if (remaining.length > 0) {
+    parts.push(remaining);
+  }
+
+  return parts;
 }
 
 // Catch-all for undefined routes

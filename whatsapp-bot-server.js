@@ -1,28 +1,31 @@
 // whatsapp-bot-server.js
-// Basic Express server with webhook endpoint for WhatsApp bot
-// Step 2C.2: Added Twilio integration and message parsing
+// WhatsApp Stock Bot Server with Language Preference Management
+// Step 2.6b: Integrated SQLite user management
 
 const express = require('express');
 const bodyParser = require('body-parser');
 const twilio = require('twilio');
 const { analyzeStocks } = require('./stock-analysis');
+const UserManager = require('./user-manager');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Initialize Twilio client with API Key authentication (correct format)
+// Initialize Twilio client with API Key authentication
 const twilioClient = twilio(
-  process.env.TWILIO_API_KEY_SID, // API Key SID (SK...)
-  process.env.TWILIO_API_KEY_SECRET, // API Key Secret
+  process.env.TWILIO_API_KEY_SID,
+  process.env.TWILIO_API_KEY_SECRET,
   {
-    accountSid: process.env.TWILIO_ACCOUNT_SID, // Account SID (AC...)
+    accountSid: process.env.TWILIO_ACCOUNT_SID,
   }
 );
 
+// Initialize User Manager
+const userManager = new UserManager();
+
 // Configuration
 const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
-const TARGET_PHONE_NUMBER = process.env.TARGET_PHONE_NUMBER;
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -53,7 +56,25 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Webhook endpoint for WhatsApp messages - Multi-user version
+// Admin endpoint to get user statistics
+app.get('/admin/stats', async (req, res) => {
+  try {
+    const stats = await userManager.getUserStats();
+    res.status(200).json({
+      status: 'success',
+      data: stats,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('❌ Error getting user stats:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get user statistics',
+    });
+  }
+});
+
+// Webhook endpoint for WhatsApp messages
 app.post('/webhook', (req, res) => {
   console.log('📱 Webhook received at:', new Date().toISOString());
 
@@ -84,63 +105,109 @@ app.post('/webhook', (req, res) => {
     `📊 User Activity: ${profileName || 'Unknown'} (${fromNumber}) - "${messageBody}"`
   );
 
-  // Process the message for any user
-  processStockRequest(messageBody, fromNumber);
+  // Process the message with language preference handling
+  processMessageWithLanguageSupport(messageBody, fromNumber);
 });
 
-// Updated processStockRequest to handle any user
-async function processStockRequest(messageBody, fromNumber) {
+// Process message with language preference management
+async function processMessageWithLanguageSupport(messageBody, fromNumber) {
   try {
-    console.log(`🔍 Processing request from ${fromNumber}:`, messageBody);
+    console.log(`🔍 Processing message from ${fromNumber}:`, messageBody);
+
+    // Handle language preference flow
+    const languageResult = await userManager.handleLanguagePreference(
+      fromNumber,
+      messageBody
+    );
+
+    // If it's a language command, send confirmation and return
+    if (languageResult.isLanguageCommand) {
+      console.log(
+        `🗣️ Language command processed: ${languageResult.language}`
+      );
+      await sendWhatsAppMessage(languageResult.message, fromNumber);
+      return;
+    }
+
+    // If user needs to set language preference, ask for it
+    if (languageResult.needsLanguagePreference) {
+      console.log('❓ New user - asking for language preference');
+      await sendWhatsAppMessage(languageResult.message, fromNumber);
+      return;
+    }
+
+    // User has language preference - proceed with stock analysis
+    const userLanguage = languageResult.language;
+    console.log(`📈 Proceeding with stock analysis in: ${userLanguage}`);
 
     // Clean up the message
     const stockNames = messageBody.trim();
 
     if (!stockNames) {
       console.log('❌ Empty message received');
-      await sendWhatsAppMessage(
-        'कृपया स्टॉक का नाम भेजें। जैसे: TCS या Reliance',
-        fromNumber
-      );
+      const emptyMessage =
+          userLanguage === 'english'
+            ? 'Please send a stock name. Example: TCS or Reliance'
+            : 'कृपया स्टॉक का नाम भेजें। जैसे: TCS या Reliance';
+      await sendWhatsAppMessage(emptyMessage, fromNumber);
       return;
     }
 
-    // Send acknowledgment message
-    await sendWhatsAppMessage(
-      '📊 विश्लेषण कर रहे हैं... कृपया 30 सेकंड रुकें',
-      fromNumber
-    );
+    // Send acknowledgment message in user's preferred language
+    const acknowledgmentMessage =
+        userLanguage === 'english'
+          ? '📊 Analyzing stocks... Please wait 30 seconds'
+          : '📊 विश्लेषण कर रहे हैं... कृपया 30 सेकंड रुकें';
 
-    // Run actual stock analysis
+    await sendWhatsAppMessage(acknowledgmentMessage, fromNumber);
+
+    // Run stock analysis with language preference
     console.log('📈 Starting stock analysis for:', stockNames);
-    const analysisResult = await analyzeStocks(stockNames);
+    const analysisResult = await analyzeStocks(stockNames, userLanguage);
 
     console.log('✅ Stock analysis completed');
 
     // Send the analysis result
     await sendWhatsAppMessage(analysisResult, fromNumber);
   } catch (error) {
-    console.error('❌ Error processing stock request:', error);
+    console.error('❌ Error processing message:', error);
 
-    // Send user-friendly error message
+    // Send user-friendly error message based on error type and language
     let errorMessage = 'विश्लेषण में समस्या हुई। कृपया बाद में कोशिश करें।';
+    let userLanguage = 'hindi'; // Default to hindi
 
+    try {
+      // Try to get user language for error message
+      userLanguage = await userManager.getUserLanguagePreference(fromNumber);
+    } catch (langError) {
+      console.error('❌ Could not determine user language for error:', langError);
+      // Keep default hindi language
+    }
+
+    // Set base error message based on language
+    if (userLanguage === 'english') {
+      errorMessage = 'Analysis failed. Please try again later.';
+    }
+
+    // Customize error message based on error type
     if (error.message && error.message.includes('API')) {
       errorMessage =
-        'स्टॉक डेटा प्राप्त करने में समस्या हुई। कृपया बाद में कोशिश करें।';
+          userLanguage === 'english'
+            ? 'Unable to fetch stock data. Please try again later.'
+            : 'स्टॉक डेटा प्राप्त करने में समस्या हुई। कृपया बाद में कोशिश करें।';
     } else if (error.message && error.message.includes('OpenAI')) {
-      errorMessage = 'विश्लेषण सेवा में समस्या है। कृपया बाद में कोशिश करें।';
+      errorMessage =
+          userLanguage === 'english'
+            ? 'Analysis service is experiencing issues. Please try again later.'
+            : 'विश्लेषण सेवा में समस्या है। कृपया बाद में कोशिश करें।';
     }
 
     await sendWhatsAppMessage(errorMessage, fromNumber);
   }
 }
 
-// Updated sendWhatsAppMessage to accept recipient parameter
-async function sendWhatsAppMessage(
-  messageText,
-  toNumber = TARGET_PHONE_NUMBER
-) {
+// Send WhatsApp message via Twilio
+async function sendWhatsAppMessage(messageText, toNumber) {
   try {
     console.log(
       `📤 Sending to ${toNumber}:`,
@@ -183,48 +250,76 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-app.listen(port, () => {
-  console.log('🚀 WhatsApp Stock Bot Server Started');
-  console.log(`📍 Server running on port ${port}`);
-  console.log(`🔗 Health check: http://localhost:${port}/`);
-  console.log(`🔗 Webhook endpoint: http://localhost:${port}/webhook`);
-  console.log('📊 Stock analysis engine imported successfully');
-  console.log('---');
-  console.log('Environment variables loaded:');
-  console.log(`• PORT: ${port}`);
-  console.log(
-    `• TWILIO_ACCOUNT_SID: ${process.env.TWILIO_ACCOUNT_SID ? '✅ Set' : '❌ Missing'}`
-  );
-  console.log(
-    `• TWILIO_API_KEY_SID: ${process.env.TWILIO_API_KEY_SID ? '✅ Set' : '❌ Missing'}`
-  );
-  console.log(
-    `• TWILIO_API_KEY_SECRET: ${process.env.TWILIO_API_KEY_SECRET ? '✅ Set' : '❌ Missing'}`
-  );
-  console.log(
-    `• TWILIO_WHATSAPP_NUMBER: ${process.env.TWILIO_WHATSAPP_NUMBER ? '✅ Set' : '❌ Missing'}`
-  );
-  console.log(
-    `• TARGET_PHONE_NUMBER: ${process.env.TARGET_PHONE_NUMBER ? '✅ Set' : '❌ Missing'}`
-  );
-  console.log(
-    `• OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Missing'}`
-  );
-  console.log(
-    `• RAPIDAPI_KEY: ${process.env.RAPIDAPI_KEY ? '✅ Set' : '❌ Missing'}`
-  );
-  console.log('---');
-  console.log('⏳ Ready for full stock analysis via WhatsApp...');
-});
+// Initialize user manager and start server
+async function startServer() {
+  try {
+    // Initialize user management system
+    console.log('🔄 Initializing user management system...');
+    await userManager.initialize();
+
+    // Start server
+    app.listen(port, () => {
+      console.log('🚀 WhatsApp Stock Bot Server Started');
+      console.log(`📍 Server running on port ${port}`);
+      console.log(`🔗 Health check: http://localhost:${port}/`);
+      console.log(`🔗 Webhook endpoint: http://localhost:${port}/webhook`);
+      console.log(`🔗 Admin stats: http://localhost:${port}/admin/stats`);
+      console.log('📊 Stock analysis engine imported successfully');
+      console.log('🗄️ SQLite user management ready');
+      console.log('---');
+      console.log('Environment variables loaded:');
+      console.log(`• PORT: ${port}`);
+      console.log(
+        `• TWILIO_ACCOUNT_SID: ${
+          process.env.TWILIO_ACCOUNT_SID ? '✅ Set' : '❌ Missing'
+        }`
+      );
+      console.log(
+        `• TWILIO_API_KEY_SID: ${
+          process.env.TWILIO_API_KEY_SID ? '✅ Set' : '❌ Missing'
+        }`
+      );
+      console.log(
+        `• TWILIO_API_KEY_SECRET: ${
+          process.env.TWILIO_API_KEY_SECRET ? '✅ Set' : '❌ Missing'
+        }`
+      );
+      console.log(
+        `• TWILIO_WHATSAPP_NUMBER: ${
+          process.env.TWILIO_WHATSAPP_NUMBER ? '✅ Set' : '❌ Missing'
+        }`
+      );
+      console.log(
+        `• OPENAI_API_KEY: ${
+          process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Missing'
+        }`
+      );
+      console.log(
+        `• RAPIDAPI_KEY: ${
+          process.env.RAPIDAPI_KEY ? '✅ Set' : '❌ Missing'
+        }`
+      );
+      console.log('---');
+      console.log('⏳ Ready for multi-language stock analysis via WhatsApp...');
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+}
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('🛑 SIGTERM received, shutting down gracefully');
+  await userManager.close();
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('🛑 SIGINT received, shutting down gracefully');
+  await userManager.close();
   process.exit(0);
 });
+
+// Start the server
+startServer();

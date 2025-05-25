@@ -3,6 +3,12 @@
 .env.local
 .env.production
 
+# SQLite database files (contains user data)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
 # Node.js dependencies
 node_modules/
 npm-debug.log*

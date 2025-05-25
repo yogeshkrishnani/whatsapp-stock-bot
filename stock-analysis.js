@@ -245,6 +245,8 @@ async function analyzeFinancialData(stockData) {
         For each point, indicate: ✅ (positive), ⚠️ (mixed), or ❌ (negative)
         End with overall recommendation: BUY/HOLD/SELL with reasoning.
         
+        IMPORTANT: Return ONLY valid JSON without any markdown formatting or code blocks.
+        
         Return as JSON: {
           "points": [
             {"aspect": "Company Size", "signal": "✅", "analysis": "Large cap with strong market position"},
@@ -273,7 +275,14 @@ async function analyzeFinancialData(stockData) {
       });
 
       try {
-        const analysis = JSON.parse(completion.choices[0].message.content.trim());
+        // Clean the response by removing markdown code blocks
+        let responseText = completion.choices[0].message.content.trim();
+
+        // Remove markdown json code blocks if present
+        responseText = responseText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        responseText = responseText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+
+        const analysis = JSON.parse(responseText);
         analysisResults.push({
           symbol: stock.symbol,
           companyName: stock.companyName,
@@ -284,6 +293,7 @@ async function analyzeFinancialData(stockData) {
         });
       } catch (parseError) {
         console.error(`❌ JSON parse error for ${stock.symbol}:`, parseError.message);
+        console.error('Raw response:', completion.choices[0].message.content);
         // Fallback analysis
         analysisResults.push({
           symbol: stock.symbol,

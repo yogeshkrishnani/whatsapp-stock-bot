@@ -1,6 +1,5 @@
 // stock-analysis.js
 // Detailed WhatsApp Stock Analyzer for Indian retail investors
-// Original quality analysis restored + Language support added
 // npm install axios openai dotenv
 
 const axios = require('axios');

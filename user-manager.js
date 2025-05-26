@@ -2,11 +2,10 @@
 // SQLite-based user state management for WhatsApp Stock Bot
 
 const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
 
 class UserManager {
-  constructor(dbPath = 'users.db') {
-    this.dbPath = path.join(__dirname, dbPath);
+  constructor(dbPath = '/data/users.db') {
+    this.dbPath = dbPath;
     this.db = null;
   }
 

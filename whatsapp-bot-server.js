@@ -1,10 +1,10 @@
 // whatsapp-bot-server.js
-// WhatsApp Stock Bot Server with Language Preference Management
-// Step 2.6b: Integrated SQLite user management
+// WhatsApp Stock Bot Server with Meta WhatsApp Business Cloud API
+// Updated from Twilio to Meta API integration
 
 const express = require('express');
 const bodyParser = require('body-parser');
-const twilio = require('twilio');
+const axios = require('axios');
 const { analyzeStocks } = require('./stock-analysis');
 const UserManager = require('./user-manager');
 require('dotenv').config();
@@ -12,20 +12,14 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Initialize Twilio client with API Key authentication
-const twilioClient = twilio(
-  process.env.TWILIO_API_KEY_SID,
-  process.env.TWILIO_API_KEY_SECRET,
-  {
-    accountSid: process.env.TWILIO_ACCOUNT_SID,
-  }
-);
-
 // Initialize User Manager
 const userManager = new UserManager();
 
-// Configuration
-const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
+// Meta WhatsApp Business API Configuration
+const META_GRAPH_API_URL = 'https://graph.facebook.com/v22.0';
+const PHONE_NUMBER_ID = process.env.META_PHONE_NUMBER_ID;
+const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
+const WEBHOOK_VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN;
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -41,9 +35,9 @@ app.use((req, res, next) => {
 // Health check endpoint
 app.get('/', (req, res) => {
   res.status(200).json({
-    status: 'WhatsApp Stock Bot Server Running',
+    status: 'WhatsApp Stock Bot Server Running (Meta API)',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
+    version: '2.0.0',
   });
 });
 
@@ -74,42 +68,107 @@ app.get('/admin/stats', async (req, res) => {
   }
 });
 
-// Webhook endpoint for WhatsApp messages
+// Webhook endpoint for WhatsApp messages (Meta format)
 app.post('/webhook', (req, res) => {
-  console.log('📱 Webhook received at:', new Date().toISOString());
+  console.log('📱 Meta webhook received at:', new Date().toISOString());
+  console.log('📨 Webhook body:', JSON.stringify(req.body, null, 2));
 
-  // Acknowledge receipt immediately (async pattern)
-  res.status(200).send('OK');
+  try {
+    // Parse Meta webhook data
+    const body = req.body;
 
-  // Parse Twilio webhook data
-  const messageBody = req.body.Body || '';
-  const fromNumber = req.body.From || '';
-  const toNumber = req.body.To || '';
-  const profileName = req.body.ProfileName || '';
+    // Check if it's a WhatsApp message
+    if (body.object === 'whatsapp_business_account') {
+      // Acknowledge receipt immediately (async pattern)
+      res.status(200).send('OK');
 
-  console.log('📨 Message received:');
-  console.log(`• From: ${fromNumber} (${profileName})`);
-  console.log(`• To: ${toNumber}`);
-  console.log(`• Message: "${messageBody}"`);
+      // Process each entry
+      body.entry.forEach(entry => {
+        const changes = entry.changes || [];
 
-  // Validate this is to our WhatsApp number (security check)
-  if (toNumber !== TWILIO_WHATSAPP_NUMBER) {
-    console.log('⚠️ Message to unexpected number, ignoring');
-    console.log(`Expected: ${TWILIO_WHATSAPP_NUMBER}`);
-    console.log(`Received: ${toNumber}`);
-    return;
+        changes.forEach(change => {
+          if (change.field === 'messages') {
+            const value = change.value;
+
+            // Process incoming messages
+            if (value.messages && value.messages.length > 0) {
+              value.messages.forEach(message => {
+                processMetaMessage(message, value);
+              });
+            }
+          }
+        });
+      });
+    } else {
+      console.log('⚠️ Non-WhatsApp webhook received, ignoring');
+      res.status(200).send('OK');
+    }
+  } catch (error) {
+    console.error('❌ Error processing webhook:', error);
+    res.status(500).send('Error processing webhook');
   }
-
-  // Log user activity for monitoring
-  console.log(
-    `📊 User Activity: ${profileName || 'Unknown'} (${fromNumber}) - "${messageBody}"`
-  );
-
-  // Process the message with language preference handling
-  processMessageWithLanguageSupport(messageBody, fromNumber);
 });
 
-// Process message with language preference management
+// Webhook verification for Meta (GET request)
+app.get('/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  console.log('🔐 Webhook verification request:');
+  console.log(`• Mode: ${mode}`);
+  console.log(`• Token: ${token}`);
+  console.log(`• Challenge: ${challenge}`);
+
+  // Verify the webhook
+  if (mode === 'subscribe' && token === WEBHOOK_VERIFY_TOKEN) {
+    console.log('✅ Webhook verified successfully');
+    res.status(200).send(challenge);
+  } else {
+    console.log('❌ Webhook verification failed');
+    res.status(403).send('Verification failed');
+  }
+});
+
+// Process Meta WhatsApp message
+async function processMetaMessage(message, value) {
+  try {
+    // Extract message details
+    const messageType = message.type;
+    const messageId = message.id;
+    const fromNumber = message.from;
+    const timestamp = message.timestamp;
+
+    console.log('📨 Processing Meta message:');
+    console.log(`• From: ${fromNumber}`);
+    console.log(`• Type: ${messageType}`);
+    console.log(`• ID: ${messageId}`);
+    console.log(`• Timestamp: ${timestamp}`);
+
+    // Only process text messages
+    if (messageType !== 'text') {
+      console.log('⚠️ Non-text message received, ignoring');
+      return;
+    }
+
+    const messageBody = message.text.body;
+    console.log(`• Message: "${messageBody}"`);
+
+    // Get contact info if available
+    const contact = value.contacts ? value.contacts.find(c => c.wa_id === fromNumber) : null;
+    const profileName = contact ? contact.profile.name : 'Unknown';
+
+    console.log(`📊 User Activity: ${profileName} (${fromNumber}) - "${messageBody}"`);
+
+    // Process the message with language preference handling
+    await processMessageWithLanguageSupport(messageBody, fromNumber);
+
+  } catch (error) {
+    console.error('❌ Error processing Meta message:', error);
+  }
+}
+
+// Process message with language preference management (unchanged logic)
 async function processMessageWithLanguageSupport(messageBody, fromNumber) {
   try {
     console.log(`🔍 Processing message from ${fromNumber}:`, messageBody);
@@ -125,14 +184,14 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
       console.log(
         `🗣️ Language command processed: ${languageResult.language}`
       );
-      await sendWhatsAppMessage(languageResult.message, fromNumber);
+      await sendMetaWhatsAppMessage(languageResult.message, fromNumber);
       return;
     }
 
     // If user needs to set language preference, ask for it
     if (languageResult.needsLanguagePreference) {
       console.log('❓ New user - asking for language preference');
-      await sendWhatsAppMessage(languageResult.message, fromNumber);
+      await sendMetaWhatsAppMessage(languageResult.message, fromNumber);
       return;
     }
 
@@ -149,7 +208,7 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
           userLanguage === 'english'
             ? 'Please send a stock name. Example: TCS or Reliance'
             : 'कृपया स्टॉक का नाम भेजें। जैसे: TCS या Reliance';
-      await sendWhatsAppMessage(emptyMessage, fromNumber);
+      await sendMetaWhatsAppMessage(emptyMessage, fromNumber);
       return;
     }
 
@@ -159,7 +218,7 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
           ? '📊 Analyzing stocks... Please wait 30 seconds'
           : '📊 विश्लेषण कर रहे हैं... कृपया 30 सेकंड रुकें';
 
-    await sendWhatsAppMessage(acknowledgmentMessage, fromNumber);
+    await sendMetaWhatsAppMessage(acknowledgmentMessage, fromNumber);
 
     // Run stock analysis with language preference
     console.log('📈 Starting stock analysis for:', stockNames);
@@ -168,7 +227,7 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
     console.log('✅ Stock analysis completed');
 
     // Send the analysis result
-    await sendWhatsAppMessage(analysisResult, fromNumber);
+    await sendMetaWhatsAppMessage(analysisResult, fromNumber);
   } catch (error) {
     console.error('❌ Error processing message:', error);
 
@@ -202,15 +261,15 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
             : 'विश्लेषण सेवा में समस्या है। कृपया बाद में कोशिश करें।';
     }
 
-    await sendWhatsAppMessage(errorMessage, fromNumber);
+    await sendMetaWhatsAppMessage(errorMessage, fromNumber);
   }
 }
 
-// Send WhatsApp message via Twilio with fallback splitting
-async function sendWhatsAppMessage(messageText, toNumber) {
+// Send WhatsApp message via Meta Business Cloud API with fallback splitting
+async function sendMetaWhatsAppMessage(messageText, toNumber) {
   try {
     console.log(
-      `📤 Sending to ${toNumber}:`,
+      `📤 Sending Meta message to ${toNumber}:`,
       messageText.substring(0, 50) + '...'
     );
     console.log(`📏 Message length: ${messageText.length} characters`);
@@ -219,17 +278,27 @@ async function sendWhatsAppMessage(messageText, toNumber) {
 
     // Try to send as single message first
     if (messageText.length <= MAX_LENGTH) {
-      const message = await twilioClient.messages.create({
-        body: messageText,
-        from: TWILIO_WHATSAPP_NUMBER,
-        to: toNumber,
-      });
+      const response = await axios.post(
+        `${META_GRAPH_API_URL}/${PHONE_NUMBER_ID}/messages`,
+        {
+          messaging_product: 'whatsapp',
+          to: toNumber,
+          text: { body: messageText },
+          type: 'text'
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
-      console.log('✅ Message sent successfully (single):', message.sid);
-      return message;
+      console.log('✅ Meta message sent successfully:', response.data.messages[0].id);
+      return response.data;
     }
 
-    // Fallback: AI didn't respect character limit, split intelligently
+    // Fallback: Message too long, split intelligently
     console.log(`⚠️ Message over limit (${messageText.length} chars), using fallback splitting...`);
 
     const parts = splitMessageIntelligently(messageText, MAX_LENGTH);
@@ -244,13 +313,23 @@ async function sendWhatsAppMessage(messageText, toNumber) {
 
       console.log(`📤 Sending part ${i + 1}/${parts.length} (${messageToSend.length} chars)`);
 
-      const message = await twilioClient.messages.create({
-        body: messageToSend,
-        from: TWILIO_WHATSAPP_NUMBER,
-        to: toNumber,
-      });
+      const response = await axios.post(
+        `${META_GRAPH_API_URL}/${PHONE_NUMBER_ID}/messages`,
+        {
+          messaging_product: 'whatsapp',
+          to: toNumber,
+          text: { body: messageToSend },
+          type: 'text'
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
-      console.log(`✅ Part ${i + 1} sent successfully:`, message.sid);
+      console.log(`✅ Part ${i + 1} sent successfully:`, response.data.messages[0].id);
 
       // Small delay between messages
       if (i < parts.length - 1) {
@@ -262,17 +341,19 @@ async function sendWhatsAppMessage(messageText, toNumber) {
     return { success: true, parts: parts.length };
 
   } catch (error) {
-    console.error('❌ Error sending WhatsApp message:', error);
-    console.error('Error details:', {
-      status: error.status,
-      code: error.code,
-      message: error.message,
-    });
+    console.error('❌ Error sending Meta WhatsApp message:', error);
+
+    if (error.response) {
+      console.error('API Error Details:');
+      console.error('Status:', error.response.status);
+      console.error('Data:', error.response.data);
+    }
+
     return null;
   }
 }
 
-// Intelligently split message at natural break points
+// Intelligently split message at natural break points (unchanged from Twilio version)
 function splitMessageIntelligently(text, maxLength) {
   const parts = [];
   let remaining = text;
@@ -342,7 +423,7 @@ async function startServer() {
 
     // Start server
     app.listen(port, () => {
-      console.log('🚀 WhatsApp Stock Bot Server Started');
+      console.log('🚀 WhatsApp Stock Bot Server Started (Meta API)');
       console.log(`📍 Server running on port ${port}`);
       console.log(`🔗 Health check: http://localhost:${port}/`);
       console.log(`🔗 Webhook endpoint: http://localhost:${port}/webhook`);
@@ -353,23 +434,18 @@ async function startServer() {
       console.log('Environment variables loaded:');
       console.log(`• PORT: ${port}`);
       console.log(
-        `• TWILIO_ACCOUNT_SID: ${
-          process.env.TWILIO_ACCOUNT_SID ? '✅ Set' : '❌ Missing'
+        `• META_PHONE_NUMBER_ID: ${
+          process.env.META_PHONE_NUMBER_ID ? '✅ Set' : '❌ Missing'
         }`
       );
       console.log(
-        `• TWILIO_API_KEY_SID: ${
-          process.env.TWILIO_API_KEY_SID ? '✅ Set' : '❌ Missing'
+        `• META_ACCESS_TOKEN: ${
+          process.env.META_ACCESS_TOKEN ? '✅ Set' : '❌ Missing'
         }`
       );
       console.log(
-        `• TWILIO_API_KEY_SECRET: ${
-          process.env.TWILIO_API_KEY_SECRET ? '✅ Set' : '❌ Missing'
-        }`
-      );
-      console.log(
-        `• TWILIO_WHATSAPP_NUMBER: ${
-          process.env.TWILIO_WHATSAPP_NUMBER ? '✅ Set' : '❌ Missing'
+        `• WEBHOOK_VERIFY_TOKEN: ${
+          process.env.WEBHOOK_VERIFY_TOKEN ? '✅ Set' : '❌ Missing'
         }`
       );
       console.log(
@@ -383,7 +459,7 @@ async function startServer() {
         }`
       );
       console.log('---');
-      console.log('⏳ Ready for multi-language stock analysis via WhatsApp...');
+      console.log('⏳ Ready for multi-language stock analysis via Meta WhatsApp API...');
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

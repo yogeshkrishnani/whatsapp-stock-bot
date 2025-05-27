@@ -7,10 +7,13 @@ const bodyParser = require('body-parser');
 const axios = require('axios');
 const { analyzeStocks } = require('./stock-analysis');
 const UserManager = require('./user-manager');
+const { PostHog } = require('posthog-node');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+const posthog = new PostHog(process.env.POSTHOG_API_KEY);
 
 // Initialize User Manager
 const userManager = new UserManager();
@@ -184,6 +187,13 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
       console.log(
         `🗣️ Language command processed: ${languageResult.language}`
       );
+      posthog.capture({
+        distinctId: fromNumber,
+        event: languageResult.language === 'english' ? 'language_set_english' : 'language_set_hindi',
+        properties: {
+          language: languageResult.language,
+        }
+      });
       await sendMetaWhatsAppMessage(languageResult.message, fromNumber);
       return;
     }
@@ -191,6 +201,13 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
     // If user needs to set language preference, ask for it
     if (languageResult.needsLanguagePreference) {
       console.log('❓ New user - asking for language preference');
+      posthog.capture({
+        distinctId: fromNumber,
+        event: 'new_user_joined',
+        properties: {
+          language_status: 'pending'
+        }
+      });
       await sendMetaWhatsAppMessage(languageResult.message, fromNumber);
       return;
     }
@@ -220,11 +237,36 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
 
     await sendMetaWhatsAppMessage(acknowledgmentMessage, fromNumber);
 
+    const stockList = stockNames.split(/[,\s]+/).filter(name => name.length > 0);
+    posthog.capture({
+      distinctId: fromNumber,
+      event: 'stock_analysis_requested',
+      properties: {
+        stocks: stockNames,
+        stock_count: stockList.length,
+        language: userLanguage,
+        is_multi_stock: stockList.length > 1
+      }
+    });
+
     // Run stock analysis with language preference
     console.log('📈 Starting stock analysis for:', stockNames);
+    const startTime = Date.now();
     const analysisResult = await analyzeStocks(stockNames, userLanguage);
+    const responseTime = Math.round((Date.now() - startTime) / 1000); // in seconds
 
     console.log('✅ Stock analysis completed');
+
+    posthog.capture({
+      distinctId: fromNumber,
+      event: 'stock_analysis_completed',
+      properties: {
+        stocks: stockNames,
+        language: userLanguage,
+        response_time: responseTime,
+        success: true
+      }
+    });
 
     // Send the analysis result
     await sendMetaWhatsAppMessage(analysisResult, fromNumber);
@@ -260,6 +302,18 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
             ? 'Analysis service is experiencing issues. Please try again later.'
             : 'विश्लेषण सेवा में समस्या है। कृपया बाद में कोशिश करें।';
     }
+
+    posthog.capture({
+      distinctId: fromNumber,
+      event: 'stock_analysis_failed',
+      properties: {
+        stocks: messageBody || 'unknown',
+        language: userLanguage || 'unknown',
+        error_type: error.message?.includes('API') ? 'api_error' :
+          error.message?.includes('OpenAI') ? 'openai_error' : 'unknown_error',
+        error_message: error.message
+      }
+    });
 
     await sendMetaWhatsAppMessage(errorMessage, fromNumber);
   }
@@ -456,6 +510,11 @@ async function startServer() {
       console.log(
         `• RAPIDAPI_KEY: ${
           process.env.RAPIDAPI_KEY ? '✅ Set' : '❌ Missing'
+        }`
+      );
+      console.log(
+        `• POSTHOG_API_KEY: ${
+          process.env.POSTHOG_API_KEY ? '✅ Set' : '❌ Missing'
         }`
       );
       console.log('---');

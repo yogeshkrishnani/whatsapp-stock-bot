@@ -16,180 +16,141 @@ const openai = new OpenAI({
 const INDIAN_API_BASE_URL = 'https://indian-stock-exchange-api2.p.rapidapi.com';
 const INDIAN_API_HOST = 'indian-stock-exchange-api2.p.rapidapi.com';
 
-// Helper function to extract metric value from API response
-function findMetricValue(metricsArray, keyName) {
-  if (!Array.isArray(metricsArray)) return null;
-  const metric = metricsArray.find(item => item.key === keyName);
-  if (metric && metric.value !== null && metric.value !== undefined) {
-    const value = parseFloat(metric.value);
+// Helper function to find financial statement item by key
+function findFinancialItem(financialArray, keyName) {
+  if (!Array.isArray(financialArray)) return null;
+  const item = financialArray.find(item => item.key === keyName);
+  if (item && item.value !== null && item.value !== undefined) {
+    const value = parseFloat(item.value);
     return isNaN(value) ? null : value;
   }
   return null;
 }
 
-// Extract comprehensive metrics from API response
+// FIXED: Extract comprehensive metrics from FINANCIALS section (not keyMetrics)
 function extractKeyMetrics(stockData) {
   const metrics = {};
 
   try {
-    if (stockData.keyMetrics) {
-      const keyMetrics = stockData.keyMetrics;
+    // Use actual financial statements instead of unreliable keyMetrics
+    const financials = stockData.financials;
+    if (!financials || !Array.isArray(financials)) {
+      console.log('No financials data available');
+      return metrics;
+    }
 
-      // Valuation metrics
-      if (keyMetrics.valuation) {
-        metrics.peRatio =
-            findMetricValue(
-              keyMetrics.valuation,
-              'pPerEExcludingExtraordinaryItemsMostRecentFiscalYear'
-            ) ||
-            findMetricValue(
-              keyMetrics.valuation,
-              'pPerEIncludingExtraordinaryItemsTTM'
-            );
-        metrics.pbRatio = findMetricValue(
-          keyMetrics.valuation,
-          'priceToBookMostRecentFiscalYear'
-        );
-        metrics.dividendYield = findMetricValue(
-          keyMetrics.valuation,
-          'currentDividendYieldCommonStockPrimaryIssueLTM'
-        );
-        metrics.priceToSales = findMetricValue(
-          keyMetrics.valuation,
-          'priceToSalesMostRecentFiscalYear'
-        );
-      }
-
-      // Financial strength
-      if (keyMetrics.financialstrength) {
-        metrics.debtToEquity =
-            findMetricValue(
-              keyMetrics.financialstrength,
-              'totalDebtPerTotalEquityMostRecentFiscalYear'
-            ) ||
-            findMetricValue(
-              keyMetrics.financialstrength,
-              'ltDebtPerEquityMostRecentFiscalYear'
-            );
-        metrics.currentRatio = findMetricValue(
-          keyMetrics.financialstrength,
-          'currentRatioMostRecentFiscalYear'
-        );
-        metrics.freeCashFlow = findMetricValue(
-          keyMetrics.financialstrength,
-          'freeCashFlowtrailing12Month'
-        );
-      }
-
-      // Profitability margins
-      if (keyMetrics.margins) {
-        metrics.netProfitMargin = findMetricValue(
-          keyMetrics.margins,
-          'netProfitMarginPercentTrailing12Month'
-        );
-        metrics.operatingMargin = findMetricValue(
-          keyMetrics.margins,
-          'operatingMarginTrailing12Month'
-        );
-        metrics.grossMargin = findMetricValue(
-          keyMetrics.margins,
-          'grossMarginTrailing12Month'
-        );
-      }
-
-      // Management effectiveness
-      if (keyMetrics.mgmtEffectiveness) {
-        metrics.roe =
-            findMetricValue(
-              keyMetrics.mgmtEffectiveness,
-              'returnOnAverageEquityTrailing12Month'
-            ) ||
-            findMetricValue(
-              keyMetrics.mgmtEffectiveness,
-              'returnOnAverageEquityMostRecentFiscalYear'
-            );
-        metrics.roa = findMetricValue(
-          keyMetrics.mgmtEffectiveness,
-          'returnOnAverageAssetsTrailing12Month'
-        );
-        metrics.assetTurnover = findMetricValue(
-          keyMetrics.mgmtEffectiveness,
-          'assetTurnoverTrailing12Month'
-        );
-      }
-
-      // Market data
-      if (keyMetrics.priceandVolume) {
-        metrics.marketCap = findMetricValue(
-          keyMetrics.priceandVolume,
-          'marketCap'
-        );
-        metrics.beta = findMetricValue(keyMetrics.priceandVolume, 'beta');
-        metrics.avgVolume = findMetricValue(
-          keyMetrics.priceandVolume,
-          'averageVolume10Day'
-        );
-      }
-
-      // Per share data
-      if (keyMetrics.persharedata) {
-        metrics.eps =
-            findMetricValue(
-              keyMetrics.persharedata,
-              'ePSIncludingExtraOrdinaryItemsTrailing12Month'
-            ) ||
-            findMetricValue(
-              keyMetrics.persharedata,
-              'ePSExcludingExtraordinaryItemsMostRecentFiscalYear'
-            );
-        metrics.bookValue = findMetricValue(
-          keyMetrics.persharedata,
-          'bookValuePerShareMostRecentFiscalYear'
-        );
-        metrics.cashFlowPerShare = findMetricValue(
-          keyMetrics.persharedata,
-          'cashFlowPerShareTrailing12Month'
-        );
-        metrics.dividendPerShare = findMetricValue(
-          keyMetrics.persharedata,
-          'dividendsPerShareTrailing12Month'
-        );
-      }
-
-      // Growth metrics
-      if (keyMetrics.growth) {
-        metrics.revenueGrowth = findMetricValue(
-          keyMetrics.growth,
-          'revenueGrowthRate5Year'
-        );
-        metrics.epsGrowth = findMetricValue(
-          keyMetrics.growth,
-          'ePSGrowthRate5Year'
-        );
-        metrics.revenueGrowthTTM = findMetricValue(
-          keyMetrics.growth,
-          'revenueChangePercentTTMPOverTTM'
-        );
-      }
-
-      // Income statement
-      if (keyMetrics.incomeStatement) {
-        metrics.revenue = findMetricValue(
-          keyMetrics.incomeStatement,
-          'revenueTrailing12Month'
-        );
-        metrics.netIncome = findMetricValue(
-          keyMetrics.incomeStatement,
-          'netIncomeAvailableToCommonTrailing12Months'
-        );
-        metrics.ebitda = findMetricValue(
-          keyMetrics.incomeStatement,
-          'eBITDTrailing12Month'
-        );
+    // CORRECTED: Get most recent Annual data (financials are ordered by recency)
+    // financials[0] is actually the most recent, not interim data
+    let latestAnnual = null;
+    for (let i = 0; i < financials.length; i++) {
+      if (financials[i].Type === 'Annual') {
+        latestAnnual = financials[i];
+        console.log(`✅ Using Annual data for FY${latestAnnual.FiscalYear}`);
+        break;
       }
     }
+
+    if (!latestAnnual || !latestAnnual.stockFinancialMap) {
+      console.log('No annual financial data found');
+      return metrics;
+    }
+
+    const { INC, BAL, CAS } = latestAnnual.stockFinancialMap;
+
+    // INCOME STATEMENT DATA (INC) - VERIFIED KEYS
+    if (INC) {
+      metrics.revenue = findFinancialItem(INC, 'Revenue') ||
+          findFinancialItem(INC, 'TotalRevenue');
+
+      metrics.netIncome = findFinancialItem(INC, 'NetIncome') ||
+          findFinancialItem(INC, 'NetIncomeAfterTaxes');
+
+      metrics.operatingIncome = findFinancialItem(INC, 'OperatingIncome');
+      metrics.grossProfit = findFinancialItem(INC, 'GrossProfit');
+      metrics.costOfRevenue = findFinancialItem(INC, 'CostofRevenueTotal');
+
+      // Calculate margins if possible
+      if (metrics.revenue && metrics.netIncome) {
+        metrics.netProfitMargin = (metrics.netIncome / metrics.revenue) * 100;
+      }
+      if (metrics.revenue && metrics.grossProfit) {
+        metrics.grossMargin = (metrics.grossProfit / metrics.revenue) * 100;
+      }
+      if (metrics.revenue && metrics.operatingIncome) {
+        metrics.operatingMargin = (metrics.operatingIncome / metrics.revenue) * 100;
+      }
+    }
+
+    // BALANCE SHEET DATA (BAL) - VERIFIED KEYS
+    if (BAL) {
+      metrics.totalAssets = findFinancialItem(BAL, 'TotalAssets');
+      metrics.totalEquity = findFinancialItem(BAL, 'TotalEquity');
+      metrics.totalDebt = findFinancialItem(BAL, 'TotalDebt') ||
+          findFinancialItem(BAL, 'TotalLongTermDebt');
+      metrics.cash = findFinancialItem(BAL, 'Cash') ||
+          findFinancialItem(BAL, 'CashandShortTermInvestments');
+
+      // Calculate key ratios
+      if (metrics.totalDebt && metrics.totalEquity) {
+        metrics.debtToEquity = metrics.totalDebt / metrics.totalEquity;
+      }
+      if (metrics.netIncome && metrics.totalEquity) {
+        metrics.roe = (metrics.netIncome / metrics.totalEquity) * 100;
+      }
+      if (metrics.netIncome && metrics.totalAssets) {
+        metrics.roa = (metrics.netIncome / metrics.totalAssets) * 100;
+      }
+
+      // Shares outstanding for per-share calculations
+      const sharesOutstanding = findFinancialItem(BAL, 'TotalCommonSharesOutstanding');
+      if (sharesOutstanding && metrics.netIncome) {
+        metrics.eps = metrics.netIncome / sharesOutstanding;
+      }
+
+      // Calculate market cap if we have current price
+      if (stockData.currentPrice && sharesOutstanding) {
+        const currentPrice = parseFloat(stockData.currentPrice.BSE) ||
+            parseFloat(stockData.currentPrice.NSE);
+        if (currentPrice) {
+          metrics.marketCap = currentPrice * sharesOutstanding;
+          metrics.currentPrice = currentPrice;
+        }
+      }
+    }
+
+    // CASH FLOW DATA (CAS) - Additional insights
+    if (CAS) {
+      metrics.operatingCashFlow = findFinancialItem(CAS, 'CashfromOperatingActivities');
+      metrics.freeCashFlow = findFinancialItem(CAS, 'CashfromOperatingActivities');
+
+      const capex = findFinancialItem(CAS, 'CapitalExpenditures');
+      if (metrics.operatingCashFlow && capex) {
+        metrics.freeCashFlow = metrics.operatingCashFlow + capex; // capex is negative
+      }
+    }
+
+    // Use ONLY ratios and percentages from keyMetrics (not absolute values)
+    if (stockData.keyMetrics && stockData.keyMetrics.valuation) {
+      const valuation = stockData.keyMetrics.valuation;
+      metrics.peRatio = findFinancialItem(valuation, 'pPerEExcludingExtraordinaryItemsMostRecentFiscalYear');
+      metrics.pbRatio = findFinancialItem(valuation, 'priceToBookMostRecentFiscalYear');
+      metrics.dividendYield = findFinancialItem(valuation, 'currentDividendYieldCommonStockPrimaryIssueLTM');
+    }
+
+    // Market data from main response (this is usually accurate)
+    metrics.yearHigh = parseFloat(stockData.yearHigh) || null;
+    metrics.yearLow = parseFloat(stockData.yearLow) || null;
+    metrics.percentChange = parseFloat(stockData.percentChange) || 0;
+
+    console.log('✅ Extracted metrics from FINANCIALS section (accurate data)');
+    console.log(`   Revenue: ₹${metrics.revenue} crores (vs keyMetrics inflated data)`);
+    console.log(`   Net Income: ₹${metrics.netIncome} crores (vs keyMetrics inflated data)`);
+    console.log(`   Net Margin: ${metrics.netProfitMargin?.toFixed(1)}%`);
+    console.log(`   ROE: ${metrics.roe?.toFixed(1)}%`);
+    console.log(`   Debt/Equity: ${metrics.debtToEquity?.toFixed(2)}`);
+
   } catch (error) {
-    console.log('Error extracting metrics:', error.message);
+    console.error('Error extracting metrics from financials:', error.message);
   }
 
   return metrics;

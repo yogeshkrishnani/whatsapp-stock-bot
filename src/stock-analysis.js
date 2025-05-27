@@ -270,63 +270,64 @@ async function generateDetailedHindiAnalysis(stockData) {
     }
 
     const prompt = `
-You are an expert Indian stock analyst providing detailed analysis in Hindi for a 60-year old retail investor.
+आप एक विशेषज्ञ भारतीय स्टॉक विश्लेषक हैं जो 60 वर्षीय खुदरा निवेशकों के लिए हिंदी में विस्तृत विश्लेषण प्रदान कर रहे हैं।
 
-Company: ${companyName}
-Industry: ${industry}
-Current Price: ₹${currentPrice}
-Today's Change: ${percentChange}%
-52-Week High: ₹${yearHigh}
-52-Week Low: ₹${yearLow}
-Price from High: ${priceFromHigh}
+कंपनी: ${companyName}
+उद्योग: ${industry}
+वर्तमान कीमत: ₹${currentPrice}
+आज का बदलाव: ${percentChange}%
+52-सप्ताह उच्च: ₹${yearHigh}
+52-सप्ताह निम्न: ₹${yearLow}
+वर्तमान कीमत अपने 52-सप्ताह के उच्च से ${priceFromHigh} नीचे है।
 
-Financial Metrics:
-- Market Cap: ₹${metrics.marketCap || 'N/A'} crores
-- PE Ratio: ${metrics.peRatio || 'N/A'}
-- PB Ratio: ${metrics.pbRatio || 'N/A'}
-- ROE: ${metrics.roe || 'N/A'}%
-- ROA: ${metrics.roa || 'N/A'}%
-- Debt to Equity: ${metrics.debtToEquity || 'N/A'}
-- Net Profit Margin: ${metrics.netProfitMargin || 'N/A'}%
-- EPS: ₹${metrics.eps || 'N/A'}
-- Revenue: ₹${metrics.revenue || 'N/A'} crores
-- Net Income: ₹${metrics.netIncome || 'N/A'} crores
-- Revenue Growth: ${metrics.revenueGrowth || 'N/A'}%
-- EPS Growth: ${metrics.epsGrowth || 'N/A'}%
+वित्तीय मेट्रिक्स:
+| मेट्रिक               | मूल्य                                    |
+|----------------------|----------------------------------------|
+| मार्केट कैप            | ₹${metrics.marketCap || 'N/A'} करोड़   |
+| PE अनुपात             | ${metrics.peRatio || 'N/A'}            |
+| PB अनुपात             | ${metrics.pbRatio || 'N/A'}            |
+| ROE                  | ${metrics.roe || 'N/A'}%               |
+| ROA                  | ${metrics.roa || 'N/A'}%               |
+| कर्ज से इक्विटी अनुपात   | ${metrics.debtToEquity || 'N/A'}       |
+| शुद्ध लाभ मार्जिन       | ${metrics.netProfitMargin || 'N/A'}%   |
+| EPS                  | ₹${metrics.eps || 'N/A'}               |
+| आय                   | ₹${metrics.revenue || 'N/A'} करोड़      |
+| शुद्ध आय              | ₹${metrics.netIncome || 'N/A'} करोड़    |
+| आय वृद्धि             | ${metrics.revenueGrowth || 'N/A'}%     |
+| EPS वृद्धि            | ${metrics.epsGrowth || 'N/A'}%         |
 
-Create analysis in this EXACT format:
+इस सटीक प्रारूप में विश्लेषण बनाएं:
 
 ${companyName.toUpperCase()}:
 
-✅ *कंपनी कितनी बड़ी है:* [Market cap info and size description]
-✅ *वर्ष-दर-वर्ष का प्रॉफिट:* [Year-wise profit trend with numbers]
-✅ *शेयर का आज का भाव:* [Current price and position vs 52-week high/low]
-⚠️ *कीमत vs कमाई (P/E):* [P/E analysis and whether cheap/expensive]
-✅ *जोखिम (Challenges):* [Specific business/market risks]
+✅ *कंपनी कितनी बड़ी है:* [मार्केट कैप की जानकारी और वास्तविक संख्याओं के साथ आकार का विवरण]
+✅ *वर्ष-दर-वर्ष का प्रॉफिट:* [विशिष्ट आय और वृद्धि संख्याओं के साथ लाभ के रुझान]
+✅ *शेयर का आज का भाव:* [वर्तमान कीमत और 52-सप्ताह उच्च/निम्न के मुकाबले स्थिति प्रतिशत के साथ]
+⚠️ *कीमत vs कमाई (P/E):* [वास्तविक अनुपात और मूल्यांकन आकलन के साथ P/E विश्लेषण]
+✅ *जोखिम (Challenges):* [कर्ज के स्तर के साथ विशिष्ट व्यापारिक/बाजार जोखिम]
 
-*संक्षिप्त सार:* [2-3 line summary of overall situation]
+*संक्षिप्त सार:* [समग्र निवेश स्थिति का 2-3 लाइन का सारांश]
 
-*सलाह:* 👉 *खरीदें* – [Brief reasoning for recommendation]
+*सलाह:* 👉 *खरीदें* – [मुख्य संख्याओं के साथ सिफारिश का संक्षिप्त तर्क]
 
-IMPORTANT SYMBOL RULES:
-- Replace symbols with exactly one of these based on each point:
-  ✅ = POSITIVE for investment (good profits, low debt, cheap valuation, strong growth, large stable company)
-  ⚠️ = NEUTRAL/MIXED for investment (moderate concerns, industry risks, fair valuation, mixed signals)
-  ❌ = NEGATIVE for investment (losses, high debt, expensive valuation, declining trends, high risk)
+प्रतीक दिशानिर्देश:
+- ✅ सकारात्मक संकेतक (जैसे मजबूत लाभ, कम कर्ज, आकर्षक मूल्यांकन, मजबूत वृद्धि, बड़ी स्थिर कंपनी)
+- ⚠️ तटस्थ/मिश्रित संकेतक (जैसे मध्यम चिंताएं, उद्योग जोखिम, उचित मूल्यांकन, मिश्रित संकेत)  
+- ❌ नकारात्मक संकेतक (जैसे हानि, उच्च कर्ज, महंगा मूल्यांकन, गिरते रुझान, उच्च जोखिम)
 
-Guidelines:
-- Use simple, everyday Hindi words that a 60-year old can easily understand
-- Avoid complex financial jargon - use simple terms like "मुनाफा" instead of "प्रॉफिटेबिलिटी"
-- Convert technical terms: "Market Cap" → "कंपनी का साइज़", "Debt" → "कर्जा", "Revenue" → "बिक्री"
-- Use actual numbers wherever possible
-- Be specific about percentages, amounts, market cap
-- Use SINGLE asterisks for bold formatting (*text*) - NOT double asterisks
-- Give practical investment advice
-- Compare with industry averages when relevant
-- Mention specific risks for the business
-- Keep language conversational and easy to follow
-- Include exact current price and 52-week comparison
-- IMPORTANT: Keep total response under 1500 characters including all formatting and symbols
+दिशानिर्देश:
+- 60+ आयु वर्ग के लिए सरल, रोजमर्रा के हिंदी शब्दों का उपयोग करें
+- जटिल वित्तीय शब्दजाल से बचें - "प्रॉफिटेबिलिटी" के बजाय "मुनाफा" जैसे सरल शब्दों का उपयोग करें
+- तकनीकी शब्दों का अनुवाद करें: "Market Cap" → "कंपनी का साइज़", "Debt" → "कर्जा", "Revenue" → "बिक्री"
+- जहां भी संभव हो वास्तविक संख्याओं का उपयोग करें
+- प्रतिशत, राशि, मार्केट कैप के बारे में विशिष्ट रहें
+- बोल्ड फॉर्मेटिंग के लिए एकल तारांकन (*text*) का उपयोग करें
+- व्यावहारिक निवेश सलाह दें
+- प्रासंगिक होने पर उद्योग औसत के साथ तुलना करें
+- व्यवसाय के लिए विशिष्ट जोखिमों का उल्लेख करें
+- बातचीत की भाषा रखें और समझने में आसान बनाएं
+- सटीक वर्तमान कीमत और 52-सप्ताह की तुलना शामिल करें
+- ⚠️ सुनिश्चित करें कि प्रारूपण और प्रतीकों सहित पूरी प्रतिक्रिया 1,500 वर्णों से अधिक न हो
 `;
 
     const completion = await openai.chat.completions.create({
@@ -380,21 +381,23 @@ Current Price: ₹${currentPrice}
 Today's Change: ${percentChange}%
 52-Week High: ₹${yearHigh}
 52-Week Low: ₹${yearLow}
-Price from High: ${priceFromHigh}
+Current Price is ${priceFromHigh} below its 52-week high.
 
 Financial Metrics:
-- Market Cap: ₹${metrics.marketCap || 'N/A'} crores
-- PE Ratio: ${metrics.peRatio || 'N/A'}
-- PB Ratio: ${metrics.pbRatio || 'N/A'}
-- ROE: ${metrics.roe || 'N/A'}%
-- ROA: ${metrics.roa || 'N/A'}%
-- Debt to Equity: ${metrics.debtToEquity || 'N/A'}
-- Net Profit Margin: ${metrics.netProfitMargin || 'N/A'}%
-- EPS: ₹${metrics.eps || 'N/A'}
-- Revenue: ₹${metrics.revenue || 'N/A'} crores
-- Net Income: ₹${metrics.netIncome || 'N/A'} crores
-- Revenue Growth: ${metrics.revenueGrowth || 'N/A'}%
-- EPS Growth: ${metrics.epsGrowth || 'N/A'}%
+| Metric              | Value                                 |
+|---------------------|---------------------------------------|
+| Market Cap          | ₹${metrics.marketCap || 'N/A'} crores |
+| PE Ratio            | ${metrics.peRatio || 'N/A'}           |
+| PB Ratio            | ${metrics.pbRatio || 'N/A'}           |
+| ROE                 | ${metrics.roe || 'N/A'}%              |
+| ROA                 | ${metrics.roa || 'N/A'}%              |
+| Debt to Equity      | ${metrics.debtToEquity || 'N/A'}      |
+| Net Profit Margin   | ${metrics.netProfitMargin || 'N/A'}%  |
+| EPS                 | ₹${metrics.eps || 'N/A'}              |
+| Revenue             | ₹${metrics.revenue || 'N/A'} crores   |
+| Net Income          | ₹${metrics.netIncome || 'N/A'} crores |
+| Revenue Growth      | ${metrics.revenueGrowth || 'N/A'}%    |
+| EPS Growth          | ${metrics.epsGrowth || 'N/A'}%        |
 
 Create analysis in this EXACT format:
 
@@ -410,23 +413,22 @@ Create analysis in this EXACT format:
 
 *Recommendation:* 👉 *BUY* – [Brief reasoning for recommendation with key numbers]
 
-IMPORTANT SYMBOL RULES:
-- Replace symbols with exactly one of these based on each point:
-  ✅ = POSITIVE for investment (good profits, low debt, cheap valuation, strong growth, large stable company)
-  ⚠️ = NEUTRAL/MIXED for investment (moderate concerns, industry risks, fair valuation, mixed signals)  
-  ❌ = NEGATIVE for investment (losses, high debt, expensive valuation, declining trends, high risk)
+Symbol Guidelines:
+- ✅ Positive indicators (e.g., strong profits, low debt, attractive valuation, robust growth, large stable company)
+- ⚠️ Neutral/Mixed indicators (e.g., moderate concerns, industry risks, fair valuation, mixed signals)
+- ❌ Negative indicators (e.g., losses, high debt, expensive valuation, declining trends, high risk)
 
 Guidelines:
-- Use simple English that retail investors can easily understand
+- Use simple English suitable for retail investors
 - Include actual financial numbers wherever possible
-- Be specific about percentages, amounts, market cap in crores
-- Use SINGLE asterisks for bold formatting (*text*) - NOT double asterisks
-- Give practical investment advice with clear reasoning
+- Be specific about percentages, amounts, and market cap in crores
+- Use SINGLE asterisks for bold formatting (*text*)
+- Provide practical investment advice with clear reasoning
 - Compare with industry averages when relevant
 - Mention specific business risks and opportunities
 - Include exact current price and 52-week range analysis
 - Use "crores" for Indian market cap and revenue figures
-- IMPORTANT: Keep total response under 1500 characters including all formatting and symbols
+- ⚠️ Ensure the entire response, including formatting and symbols, does not exceed 1,500 characters
 `;
 
     const completion = await openai.chat.completions.create({

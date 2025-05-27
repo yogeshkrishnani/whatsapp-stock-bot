@@ -27,6 +27,7 @@ function findFinancialItem(financialArray, keyName) {
   return null;
 }
 
+// New function to prepare 3-year historical financial data and risk assessment
 function prepareHistoricalFinancialData(stockData) {
   const historicalData = {
     // For populating existing metrics placeholders
@@ -45,11 +46,30 @@ function prepareHistoricalFinancialData(stockData) {
   };
 
   try {
+    // Debug: Check what data structure we have
+    console.log('🔍 Checking stockData structure:');
+    console.log(`   Has financials: ${!!stockData.financials}`);
+    console.log(`   Financials type: ${typeof stockData.financials}`);
+    console.log(`   Financials length: ${stockData.financials?.length || 'N/A'}`);
+
+    // Check if financials data exists
+    if (!stockData.financials || !Array.isArray(stockData.financials)) {
+      console.log('⚠️ No financials data available for historical analysis');
+      return historicalData; // Return default values
+    }
+
     // Get last 3 years of Annual financial data
     const annualData = stockData.financials
       .filter(f => f.Type === 'Annual')
       .slice(0, 3) // Most recent 3 years
       .reverse(); // Arrange oldest to newest for growth calculation
+
+    if (annualData.length === 0) {
+      console.log('⚠️ No Annual financial data found');
+      return historicalData; // Return default values
+    }
+
+    console.log(`📊 Found ${annualData.length} years of Annual data`);
 
     // Extract financial data for each year
     annualData.forEach(yearData => {

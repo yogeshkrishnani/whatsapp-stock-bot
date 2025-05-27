@@ -402,6 +402,13 @@ async function generateDetailedHindiAnalysis(stockData) {
     const prompt = `
 आप 60+ उम्र के निवेशकों के लिए बिलकुल साधारण, बोलचाल की हिंदी में और केवल बहुत आसान English शब्दों में बात करेंगे (जैसे “profit”, “revenue”, “market cap”)।
 
+— प्रतीक परिभाषाएँ (केवल इन्हीं का उपयोग करें) —  
+• ✅ यदि मेट्रिक पूरी तरह से सकारात्मक हो (जैसे मजबूत मुनाफा, कम कर्जा, आकर्षक मूल्यांकन, अच्छी बढ़त)  
+• ⚠️ यदि मेट्रिक तटस्थ/मिश्रित हो (जैसे औसत P/E, छोटे सुधार/गिरावट, मध्यम चिंताएं)  
+• ❌ यदि मेट्रिक स्पष्ट रूप से नकारात्मक हो (जैसे हानि, गिरती आय, उच्च कर्जा, महंगा मूल्यांकन)  
+• यदि कंपनी को हानि हो या आय घट रही हो, तो *Year-on-Year Profit* के लिए हमेशा ❌ का उपयोग करें।  
+• यदि कंपनी के पास नकारात्मक मार्जिन या वित्तीय अस्थिरता हो, तो *Challenges* के लिए हमेशा ❌ का उपयोग करें।  
+
 नीचे सिर्फ इन्हीं शब्दों का इस्तेमाल करें:
 - “company size” (market cap)  
 - “revenue” (कुल बिक्री)  
@@ -451,12 +458,7 @@ ${companyName.toUpperCase()}:
 
 *संक्षिप्त सार:* [समग्र निवेश स्थिति का 2-3 लाइन का सारांश]
 
-*सलाह:* 👉 *खरीदें* – [मुख्य संख्याओं के साथ सिफारिश का संक्षिप्त तर्क]
-
-प्रतीक दिशानिर्देश:
-- ✅ सकारात्मक संकेतक (जैसे मजबूत लाभ, कम कर्ज, आकर्षक मूल्यांकन, मजबूत वृद्धि, बड़ी स्थिर कंपनी)
-- ⚠️ तटस्थ/मिश्रित संकेतक (जैसे मध्यम चिंताएं, उद्योग जोखिम, उचित मूल्यांकन, मिश्रित संकेत)  
-- ❌ नकारात्मक संकेतक (जैसे हानि, उच्च कर्ज, महंगा मूल्यांकन, गिरते रुझान, उच्च जोखिम)
+*सलाह:* 👉 *खरीदें/रुकें/बेचें* – [मुख्य संख्याओं के साथ संक्षिप्त तर्क]
 
 दिशानिर्देश:
 - 60+ आयु वर्ग के लिए सरल, रोजमर्रा के हिंदी शब्दों का उपयोग करें
@@ -506,7 +508,7 @@ async function generateDetailedEnglishAnalysis(stockData) {
     } = stockData;
 
     // CHANGE 1: Use new function instead of extractKeyMetrics
-    const metrics = extractKeyMetricsWithHistory(stockData); // <- Only this line changed
+    const metrics = stockData.metrics; // <- Only this line changed
 
     // Calculate price position (unchanged)
     let priceFromHigh = '';
@@ -519,6 +521,26 @@ async function generateDetailedEnglishAnalysis(stockData) {
 
     const prompt = `
 You are an expert Indian stock analyst providing detailed analysis in English for retail investors.
+
+— SYMBOL DEFINITIONS (use **only** these)** —  
+• ✅ if the metric is genuinely POSITIVE (e.g., profits ↑, margins healthy, low debt, valuation attractive)  
+• ⚠️ if the metric is NEUTRAL/MIXED (e.g., fair valuation, moderate concerns, small declines, P/E near avg)  
+• ❌ if the metric is genuinely NEGATIVE (e.g., losses, declining revenue, high debt, expensive valuation)  
+• If a company has losses or declining revenue, ALWAYS use ❌ for Year-on-Year Profits.
+• If a company has severe issues (negative margins, financial instability), ALWAYS use ❌ for Risks & Challenges.
+
+— Guidelines:
+- Use simple English suitable for retail investors
+- Include actual financial numbers wherever possible
+- Be specific about percentages, amounts, and market cap in crores
+- Use SINGLE asterisks for bold formatting (*text*)
+- Provide practical investment advice with clear reasoning
+- Compare with industry averages when relevant
+- Mention specific business risks and opportunities
+- Include exact current price and 52-week range analysis
+- Use "crores" for Indian market cap and revenue figures
+- Consider the ${metrics.riskLevel} risk level based on financial volatility in your recommendation
+- ⚠️ Ensure the entire response, including formatting and symbols, does not exceed 1,500 characters
 
 Company: ${companyName}
 Industry: ${industry}
@@ -544,6 +566,8 @@ Financial Metrics:
 | Revenue Growth      | ${metrics.revenueGrowth || 'N/A'}%    |
 | EPS Growth          | ${metrics.epsGrowth || 'N/A'}%        |
 
+— YOUR TASK — 
+
 Create analysis in this EXACT format:
 
 *${companyName.toUpperCase()}:*
@@ -555,25 +579,7 @@ Create analysis in this EXACT format:
 
 *Summary:* [2-3 line summary of overall investment situation]
 
-*Recommendation:* 👉 *BUY* – [Brief reasoning for recommendation with key numbers]
-
-Symbol Guidelines:
-- ✅ Positive indicators (e.g., strong profits, low debt, attractive valuation, robust growth, large stable company)
-- ⚠️ Neutral/Mixed indicators (e.g., moderate concerns, industry risks, fair valuation, mixed signals)
-- ❌ Negative indicators (e.g., losses, high debt, expensive valuation, declining trends, high risk)
-
-Guidelines:
-- Use simple English suitable for retail investors
-- Include actual financial numbers wherever possible
-- Be specific about percentages, amounts, and market cap in crores
-- Use SINGLE asterisks for bold formatting (*text*)
-- Provide practical investment advice with clear reasoning
-- Compare with industry averages when relevant
-- Mention specific business risks and opportunities
-- Include exact current price and 52-week range analysis
-- Use "crores" for Indian market cap and revenue figures
-- Consider the ${metrics.riskLevel} risk level based on financial volatility in your recommendation
-- ⚠️ Ensure the entire response, including formatting and symbols, does not exceed 1,500 characters
+*Recommendation:* 👉 *BUY/HOLD/SELL* – [Brief reasoning for recommendation with key numbers]
 `;
 
     const completion = await openai.chat.completions.create({

@@ -1,9 +1,9 @@
 {
   "name": "whatsapp-stock-bot",
   "version": "1.0.0",
-  "main": "whatsapp-bot-server.js",
+  "main": "src/whatsapp-bot-server.js",
   "scripts": {
-    "start": "node whatsapp-bot-server.js",
+    "start": "node src/whatsapp-bot-server.js",
     "lint": "eslint *.js",
     "lint:fix": "eslint *.js --fix",
     "format": "prettier --write *.js",

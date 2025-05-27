@@ -27,6 +27,155 @@ function findFinancialItem(financialArray, keyName) {
   return null;
 }
 
+function prepareHistoricalFinancialData(stockData) {
+  const historicalData = {
+    // For populating existing metrics placeholders
+    revenueGrowth: null,
+    epsGrowth: null,
+
+    // For Year-on-Year Profits section context
+    contextSummary: '',
+
+    // Risk assessment for consistent evaluation
+    riskLevel: 'moderate',
+    volatilityScore: 0,
+
+    // Raw 3-year data for debugging
+    yearlyData: []
+  };
+
+  try {
+    // Get last 3 years of Annual financial data
+    const annualData = stockData.financials
+      .filter(f => f.Type === 'Annual')
+      .slice(0, 3) // Most recent 3 years
+      .reverse(); // Arrange oldest to newest for growth calculation
+
+    // Extract financial data for each year
+    annualData.forEach(yearData => {
+      const { INC, BAL } = yearData.stockFinancialMap || {};
+      if (INC) {
+        const revenue = findFinancialItem(INC, 'Revenue') ||
+            findFinancialItem(INC, 'TotalRevenue');
+        const netIncome = findFinancialItem(INC, 'NetIncome') ||
+            findFinancialItem(INC, 'NetIncomeAfterTaxes');
+
+        // Get shares outstanding for EPS calculation
+        const sharesOutstanding = BAL ? findFinancialItem(BAL, 'TotalCommonSharesOutstanding') : null;
+        const eps = (netIncome && sharesOutstanding) ? netIncome / sharesOutstanding : null;
+
+        historicalData.yearlyData.push({
+          year: yearData.FiscalYear,
+          revenue: revenue,
+          netIncome: netIncome,
+          eps: eps,
+          margin: (revenue && netIncome) ? ((netIncome / revenue) * 100) : null
+        });
+      }
+    });
+
+    // Calculate growth rates if we have at least 2 years of data
+    if (historicalData.yearlyData.length >= 2) {
+      const current = historicalData.yearlyData[historicalData.yearlyData.length - 1];
+      const previous = historicalData.yearlyData[historicalData.yearlyData.length - 2];
+
+      // Revenue Growth Year-over-Year
+      if (current.revenue && previous.revenue) {
+        historicalData.revenueGrowth = ((current.revenue - previous.revenue) / previous.revenue * 100).toFixed(1);
+      }
+
+      // EPS Growth Year-over-Year
+      if (current.eps && previous.eps) {
+        historicalData.epsGrowth = ((current.eps - previous.eps) / previous.eps * 100).toFixed(1);
+      }
+
+      // Calculate volatility for risk assessment
+      const revenueVolatility = Math.abs(parseFloat(historicalData.revenueGrowth || 0));
+      const profitChange = current.netIncome && previous.netIncome ?
+        Math.abs((current.netIncome - previous.netIncome) / previous.netIncome * 100) : 0;
+
+      historicalData.volatilityScore = Math.max(revenueVolatility, profitChange);
+
+      // Risk level assessment
+      if (historicalData.volatilityScore > 30) {
+        historicalData.riskLevel = 'high';
+      } else if (historicalData.volatilityScore < 15) {
+        historicalData.riskLevel = 'low';
+      } else {
+        historicalData.riskLevel = 'moderate';
+      }
+
+      // Create context summary for Year-on-Year Profits section
+      if (historicalData.yearlyData.length >= 2) {
+        const currentYear = current.year;
+        const previousYear = previous.year;
+        const revenueChange = parseFloat(historicalData.revenueGrowth || 0);
+        const profitGrowth = current.netIncome && previous.netIncome ?
+          ((current.netIncome - previous.netIncome) / previous.netIncome * 100) : 0;
+
+        let trendDescription = '';
+        if (historicalData.yearlyData.length >= 3) {
+          const oldest = historicalData.yearlyData[0];
+          // Check if this is a recovery story
+          if (profitGrowth > 15 && previous.netIncome < oldest.netIncome) {
+            trendDescription = `recovering from FY${previousYear} decline`;
+          } else if (profitGrowth > 10) {
+            trendDescription = 'showing growth momentum';
+          } else if (profitGrowth < -15) {
+            trendDescription = 'experiencing declining performance';
+          } else {
+            trendDescription = 'showing mixed performance';
+          }
+        } else {
+          if (profitGrowth > 10) {
+            trendDescription = 'showing growth';
+          } else if (profitGrowth < -10) {
+            trendDescription = 'showing decline';
+          } else {
+            trendDescription = 'showing stable performance';
+          }
+        }
+
+        historicalData.contextSummary = `Revenue ${revenueChange > 0 ? 'up' : 'down'} ${Math.abs(revenueChange).toFixed(1)}% to ₹${current.revenue} crores, ${trendDescription} with profit ${profitGrowth > 0 ? 'growth' : 'decline'} of ${profitGrowth.toFixed(1)}%`;
+      }
+    }
+
+    console.log('📊 Historical Financial Analysis:');
+    console.log(`   Revenue Growth YoY: ${historicalData.revenueGrowth}%`);
+    console.log(`   EPS Growth YoY: ${historicalData.epsGrowth}%`);
+    console.log(`   Risk Level: ${historicalData.riskLevel} (Volatility: ${historicalData.volatilityScore.toFixed(1)})`);
+    console.log(`   Context: ${historicalData.contextSummary}`);
+
+    return historicalData;
+
+  } catch (error) {
+    console.error('Error preparing historical financial data:', error.message);
+    return historicalData; // Return default values
+  }
+}
+
+// Modified extractKeyMetrics to include historical context
+function extractKeyMetricsWithHistory(stockData) {
+  // Get base metrics using existing function
+  const metrics = extractKeyMetrics(stockData);
+
+  // Add historical analysis
+  const historicalData = prepareHistoricalFinancialData(stockData);
+
+  // Populate the existing placeholder fields that were showing N/A
+  metrics.revenueGrowth = historicalData.revenueGrowth;
+  metrics.epsGrowth = historicalData.epsGrowth;
+
+  // Add risk assessment to metrics
+  metrics.riskLevel = historicalData.riskLevel;
+  metrics.volatilityScore = historicalData.volatilityScore;
+
+  // Add context for AI prompt
+  metrics.historicalContext = historicalData.contextSummary;
+
+  return metrics;
+}
+
 // FIXED: Extract comprehensive metrics from FINANCIALS section (not keyMetrics)
 function extractKeyMetrics(stockData) {
   const metrics = {};
@@ -187,7 +336,7 @@ async function fetchStockData(stockName) {
         percentChange: parseFloat(stockData.percentChange) || 0,
         yearHigh: parseFloat(stockData.yearHigh) || null,
         yearLow: parseFloat(stockData.yearLow) || null,
-        metrics: extractKeyMetrics(stockData),
+        metrics: extractKeyMetricsWithHistory(stockData), // <- Only this line changed
         analystView: stockData.analystView,
         rawData: stockData,
       };
@@ -333,11 +482,13 @@ async function generateDetailedEnglishAnalysis(stockData) {
       percentChange,
       yearHigh,
       yearLow,
-      metrics,
       industry,
     } = stockData;
 
-    // Calculate price position
+    // CHANGE 1: Use new function instead of extractKeyMetrics
+    const metrics = extractKeyMetricsWithHistory(stockData); // <- Only this line changed
+
+    // Calculate price position (unchanged)
     let priceFromHigh = '';
     if (currentPrice && yearHigh) {
       const dropPercent = Math.round(
@@ -378,10 +529,9 @@ Create analysis in this EXACT format:
 *${companyName.toUpperCase()}:*
 
 ✅ *Company Size:* [Market cap info and size description with actual numbers]
-✅ *Year-on-Year Profits:* [Profit trends with specific revenue and growth numbers]
-✅ *Today's Share Price:* [Current price and position vs 52-week high/low with percentages]
+✅ *Year-on-Year Profits:* [${metrics.historicalContext || 'Profit trends with specific revenue and growth numbers'}]
 ⚠️ *Price vs Earnings (P/E):* [P/E analysis with actual ratio and valuation assessment]
-✅ *Risks & Challenges:* [Specific business/market risks with debt levels]
+✅ *Risks & Challenges:* [Specific business/market risks with debt levels and ${metrics.riskLevel} volatility risk]
 
 *Summary:* [2-3 line summary of overall investment situation]
 
@@ -402,6 +552,7 @@ Guidelines:
 - Mention specific business risks and opportunities
 - Include exact current price and 52-week range analysis
 - Use "crores" for Indian market cap and revenue figures
+- Consider the ${metrics.riskLevel} risk level based on financial volatility in your recommendation
 - ⚠️ Ensure the entire response, including formatting and symbols, does not exceed 1,500 characters
 `;
 

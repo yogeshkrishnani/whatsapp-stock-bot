@@ -458,10 +458,10 @@ Create analysis in this EXACT format:
 
 *${companyName.toUpperCase()}:*
 
-✅ *Company Size:* [Market cap info and size description with actual numbers]
-✅ *Year-on-Year Profits:* [${metrics.historicalContext || 'Profit trends with specific revenue and growth numbers'}]
-⚠️ *Price vs Earnings (P/E):* [P/E analysis with actual ratio and valuation assessment]
-✅ *Risks & Challenges:* [Specific business/market risks with debt levels and ${metrics.riskLevel} volatility risk]
+✅/⚠️/❌ *Company Size:* [Market cap info and size description with actual numbers]
+✅/⚠️/❌ *Year-on-Year Profits:* [${metrics.historicalContext || 'Profit trends with specific revenue and growth numbers'}]
+✅/⚠️/❌ *Price vs Earnings (P/E):* [P/E analysis with actual ratio and valuation assessment]
+✅/⚠️/❌ *Risks & Challenges:* [Specific business/market risks with debt levels and ${metrics.riskLevel} volatility risk]
 
 *Summary:* [2-3 line summary of overall investment situation]
 

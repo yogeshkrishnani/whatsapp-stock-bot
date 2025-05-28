@@ -404,7 +404,7 @@ async function generateDetailedEnglishAnalysis(stockData) {
     const prompt = `
 You are an expert Indian stock analyst providing detailed analysis in English for retail investors. 
 
-IMPORTANT: Keep total response under 1500 characters including all formatting.
+IMPORTANT: Keep total response under 1600 characters including all formatting.
 
 — SYMBOL DEFINITIONS (use **only** these)** —  
 • ✅ if the metric is genuinely POSITIVE (e.g., profits ↑, margins healthy, low debt, valuation attractive)  
@@ -459,6 +459,7 @@ Create analysis in this EXACT format:
 *${companyName.toUpperCase()}:*
 
 ✅/⚠️/❌ *Company Size:* [Market cap info and size description with actual numbers]
+✅/⚠️/❌ *Current Price:* [Current price with 52-week high and 52-week low and price position]
 ✅/⚠️/❌ *Year-on-Year Profits:* [${metrics.historicalContext || 'Profit trends with specific revenue and growth numbers'}]
 ✅/⚠️/❌ *Price vs Earnings (P/E):* [P/E analysis with actual ratio and valuation assessment]
 ✅/⚠️/❌ *Risks & Challenges:* [Specific business/market risks with debt levels and ${metrics.riskLevel} volatility risk]

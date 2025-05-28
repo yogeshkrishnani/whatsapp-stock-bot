@@ -377,128 +377,6 @@ async function fetchStockData(stockName) {
   }
 }
 
-// Generate detailed analysis in Hindi (ORIGINAL QUALITY)
-async function generateDetailedHindiAnalysis(stockData) {
-  try {
-    const {
-      companyName,
-      currentPrice,
-      percentChange,
-      yearHigh,
-      yearLow,
-      metrics,
-      industry,
-    } = stockData;
-
-    // Calculate price position
-    let priceFromHigh = '';
-    if (currentPrice && yearHigh) {
-      const dropPercent = Math.round(
-        ((yearHigh - currentPrice) / yearHigh) * 100
-      );
-      priceFromHigh = dropPercent > 0 ? `${dropPercent}% कम` : 'हाई के पास';
-    }
-
-    const prompt = `
-आप 60+ उम्र के निवेशकों के लिए बिलकुल साधारण, बोलचाल की हिंदी में और केवल बहुत आसान English शब्दों में बात करेंगे (जैसे “profit”, “revenue”, “market cap”)।
-
-⚠️ सुनिश्चित करें कि पूरी प्रतिक्रिया (सभी फॉर्मेटिंग सहित) 1500 वर्णों से अधिक न हो।
-
-दिशानिर्देश:
-- सलाह देते समय लहजा आशावादी रखें, लेकिन ज़रूरत से ज़्यादा उत्साही या बढ़ा-चढ़ाकर न लिखें।
-- अगर कंपनी मजबूत है (जैसे अच्छा मुनाफा, बिक्री में बढ़त, कम कर्जा), तो कीमत ज़्यादा होने पर भी *खरीदें* की सलाह दी जा सकती है।
-- 60+ आयु वर्ग के लिए सरल, रोजमर्रा के हिंदी शब्दों का उपयोग करें
-- जटिल वित्तीय शब्दजाल से बचें - "प्रॉफिटेबिलिटी" के बजाय "मुनाफा" जैसे सरल शब्दों का उपयोग करें
-- तकनीकी शब्दों का अनुवाद करें: "Market Cap" → "कंपनी का साइज़", "Debt" → "कर्जा", "Revenue" → "बिक्री"
-- जहां भी संभव हो वास्तविक संख्याओं का उपयोग करें
-- प्रतिशत, राशि, मार्केट कैप के बारे में विशिष्ट रहें
-- बोल्ड फॉर्मेटिंग के लिए एकल तारांकन (*text*) का उपयोग करें
-- व्यावहारिक निवेश सलाह दें
-- प्रासंगिक होने पर उद्योग औसत के साथ तुलना करें
-- व्यवसाय के लिए विशिष्ट जोखिमों का उल्लेख करें
-- बातचीत की भाषा रखें और समझने में आसान बनाएं
-- सटीक वर्तमान कीमत और 52-सप्ताह की तुलना शामिल करें
-- ⚠️ सुनिश्चित करें कि प्रारूपण और प्रतीकों सहित पूरी प्रतिक्रिया 1,500 वर्णों से अधिक न हो
-
-— प्रतीक परिभाषाएँ (केवल इन्हीं का उपयोग करें) —  
-• ✅ यदि मेट्रिक पूरी तरह से सकारात्मक हो (जैसे मजबूत मुनाफा, कम कर्जा, आकर्षक मूल्यांकन, अच्छी बढ़त)  
-• ⚠️ यदि मेट्रिक तटस्थ/मिश्रित हो (जैसे औसत P/E, छोटे सुधार/गिरावट, मध्यम चिंताएं)  
-• ❌ यदि मेट्रिक स्पष्ट रूप से नकारात्मक हो (जैसे हानि, गिरती आय, उच्च कर्जा, महंगा मूल्यांकन)  
-• यदि कंपनी को हानि हो या आय घट रही हो, तो *Year-on-Year Profit* के लिए हमेशा ❌ का उपयोग करें।  
-• यदि कंपनी के पास नकारात्मक मार्जिन या वित्तीय अस्थिरता हो, तो *Challenges* के लिए हमेशा ❌ का उपयोग करें।  
-
-नीचे सिर्फ इन्हीं शब्दों का इस्तेमाल करें:
-- “company size” (market cap)  
-- “revenue” (कुल बिक्री)  
-- “profit” (कुल मुनाफा)  
-- “price” (कीमत)  
-- “growth” (बढ़त)  
-- “debt” (कर्जा)  
-
-और इन नियमों का पालन करें:
-- ज़्यादा अंग्रेजी नहीं—सिर्फ ऊपर की लिस्ट के शब्द   
-- कोई जटिल शब्द मत डालें—“EPS” जैसी शब्दावली छोड़ दें  
-- जहाँ संभव हो, सिर्फ “₹300” या “10%” जैसी संख्याएँ लिखें  
-
-कंपनी: ${companyName}
-उद्योग: ${industry}
-वर्तमान कीमत: ₹${currentPrice}
-आज का बदलाव: ${percentChange}%
-52-सप्ताह उच्च: ₹${yearHigh}
-52-सप्ताह निम्न: ₹${yearLow}
-वर्तमान कीमत अपने 52-सप्ताह के उच्च से ${priceFromHigh} नीचे है।
-
-वित्तीय मेट्रिक्स:
-| मेट्रिक               | मूल्य                                    |
-|----------------------|----------------------------------------|
-| मार्केट कैप            | ₹${metrics.marketCap || 'N/A'} करोड़   |
-| PE अनुपात             | ${metrics.peRatio || 'N/A'}            |
-| PB अनुपात             | ${metrics.pbRatio || 'N/A'}            |
-| ROE                  | ${metrics.roe || 'N/A'}%               |
-| ROA                  | ${metrics.roa || 'N/A'}%               |
-| कर्ज से इक्विटी अनुपात   | ${metrics.debtToEquity || 'N/A'}       |
-| शुद्ध लाभ मार्जिन       | ${metrics.netProfitMargin || 'N/A'}%   |
-| EPS                  | ₹${metrics.eps || 'N/A'}               |
-| आय                   | ₹${metrics.revenue || 'N/A'} करोड़      |
-| शुद्ध आय              | ₹${metrics.netIncome || 'N/A'} करोड़    |
-| आय वृद्धि             | ${metrics.revenueGrowth || 'N/A'}%     |
-| EPS वृद्धि            | ${metrics.epsGrowth || 'N/A'}%         |
-
-इस सटीक प्रारूप में विश्लेषण बनाएं:
-
-${companyName.toUpperCase()}:
-
-✅ *कंपनी कितनी बड़ी है:* [मार्केट कैप की जानकारी और वास्तविक संख्याओं के साथ आकार का विवरण]
-✅ *वर्ष-दर-वर्ष का प्रॉफिट:* [विशिष्ट आय और वृद्धि संख्याओं के साथ लाभ के रुझान]
-✅ *शेयर का आज का भाव:* [वर्तमान कीमत और 52-सप्ताह उच्च/निम्न के मुकाबले स्थिति प्रतिशत के साथ]
-⚠️ *कीमत vs कमाई (P/E):* [वास्तविक अनुपात और मूल्यांकन आकलन के साथ P/E विश्लेषण]
-✅ *जोखिम (Challenges):* [कर्ज के स्तर के साथ विशिष्ट व्यापारिक/बाजार जोखिम]
-
-*संक्षिप्त सार:* [समग्र निवेश स्थिति का 2-3 लाइन का सारांश]
-
-*सलाह:* 👉 *खरीदें/रुकें/बेचें* – [मुख्य संख्याओं के साथ संक्षिप्त तर्क]
-`;
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 800,
-      temperature: 0.3,
-    });
-
-    return completion.choices[0].message.content.trim();
-  } catch (error) {
-    console.error('Error generating Hindi analysis:', error.message);
-    return `${stockData.companyName.toUpperCase()}:
-
-✅ *स्थिति:* विश्लेषण पूरा नहीं हो सका।
-
-*संक्षिप्त सार:* ${stockData.companyName} का विस्तृत विश्लेषण तकनीकी समस्या के कारण उपलब्ध नहीं है।
-
-*सलाह:* 👉 *रुकें* – कृपया बाद में कोशिश करें।`;
-  }
-}
-
 // Generate detailed analysis in English (SAME QUALITY AS HINDI)
 async function generateDetailedEnglishAnalysis(stockData) {
   try {
@@ -610,6 +488,56 @@ Create analysis in this EXACT format:
   }
 }
 
+async function translateToHindi(englishAnalysis) {
+  try {
+    const translationPrompt = `
+Translate this English stock analysis to conversational Hindi for 60+ Indian retail investors:
+
+IMPORTANT: Keep total response under 1500 characters including all formatting.
+
+PRESERVE EXACTLY:
+- All WhatsApp formatting: *bold text*, symbols ✅⚠️❌
+- All numbers, percentages, ₹ amounts
+- Line breaks and bullet structure
+- Company names and technical terms in parentheses
+- Do not add, remove, or reflow any punctuation, numbers, or symbols
+LANGUAGE STYLE:
+- Use simple, conversational Hindi (not pure/formal Hindi)
+- Mix in common English finance words sparingly
+- For any finance term not listed below, either leave it in English or add a brief Hindi parenthetical
+SPECIFIC TRANSLATIONS:
+- "Market Cap" → "कंपनी का साइज़"
+- "Debt" → "कर्जा"
+- "Revenue" → "कारोबार"
+- "Profit" → "प्रोफिट"
+MAINTAIN STRUCTURE:
+- Same headings/bullets in same order  
+- Same recommendation logic and symbols (✅⚠️❌)
+EXAMPLE:
+"Market Cap of ₹5000cr" → "कंपनी का साइज़ ₹5000 करोड़"
+CRITICAL:
+- *सलाह:* 👉 *खरीदें/रुकें/बेचें* – [मुख्य संख्याओं के साथ संक्षिप्त तर्क]
+NOTE: Replace \`${englishAnalysis}\` with the actual analysis text—do not include the placeholder.
+  
+English Analysis to Translate:
+${englishAnalysis}
+`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: translationPrompt }],
+      max_tokens: 800,
+      temperature: 0.2, // Lower temperature for more consistent translation
+    });
+
+    return completion.choices[0].message.content.trim();
+  } catch (error) {
+    console.error('Error translating to Hindi:', error.message);
+    // Fallback: Return a simple Hindi error message
+    return 'विश्लेषण अनुवाद में त्रुटि हुई। कृपया बाद में कोशिश करें।\n\n⚠️ यह सिर्फ जानकारी है, निवेश सलाह नहीं है।';
+  }
+}
+
 // Main analysis function with language support
 async function analyzeStocks(input, language = 'hindi') {
   console.log('\n🚀 Starting Detailed Stock Analysis...');
@@ -636,19 +564,24 @@ async function analyzeStocks(input, language = 'hindi') {
       continue;
     }
 
-    // Generate detailed analysis in requested language
-    console.log(`Generating detailed ${language} analysis for: ${stockData.companyName}`);
+    // STEP 1: Always generate English analysis first
+    console.log(`Generating English analysis for: ${stockData.companyName}`);
+    const englishAnalysis = await generateDetailedEnglishAnalysis(stockData);
 
-    let analysis;
+    let finalAnalysis;
+
     if (language === 'english') {
-      analysis = await generateDetailedEnglishAnalysis(stockData);
+      // Return English analysis as-is
+      finalAnalysis = englishAnalysis;
     } else {
-      analysis = await generateDetailedHindiAnalysis(stockData);
+      // STEP 2: Translate English to Hindi
+      console.log(`Translating to Hindi for: ${stockData.companyName}`);
+      finalAnalysis = await translateToHindi(englishAnalysis);
     }
 
-    results.push(analysis);
+    results.push(finalAnalysis);
 
-    // Rate limiting
+    // Rate limiting between stocks
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
@@ -675,7 +608,7 @@ async function main() {
     console.log('Examples:');
     console.log('  node stock-analysis.js "TCS" hindi');
     console.log('  node stock-analysis.js "TCS" english');
-    console.log('  node stock-analysis.js "Reliance TCS Infosys" english');
+    console.log('  node stock-analysis.js "Reliance TCS" english');
     return;
   }
 
@@ -693,11 +626,12 @@ async function main() {
     const processingTime = Date.now() - startTime;
 
     console.log('\n' + '='.repeat(70));
-    console.log(`📱 WHATSAPP RESPONSE (${language.toUpperCase()}):`);
+    console.log(`📱 WHATSAPP RESPONSE (${language.toUpperCase()}) - NEW TRANSLATION APPROACH:`);
     console.log('='.repeat(70));
     console.log(result);
     console.log('='.repeat(70));
     console.log(`⏱️ Processing Time: ${processingTime}ms`);
+    console.log(`🔄 Method: English-first ${language === 'hindi' ? '→ Hindi Translation' : '(Direct)'}`);
   } catch (error) {
     console.error('❌ Error:', error.message);
   }

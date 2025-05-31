@@ -1,7 +1,3 @@
-// stock-analysis.js
-// Detailed WhatsApp Stock Analyzer for Indian retail investors
-// npm install axios openai dotenv
-
 const axios = require('axios');
 const OpenAI = require('openai');
 const https = require('https');
@@ -208,8 +204,6 @@ function extractKeyMetrics(stockData) {
       return metrics;
     }
 
-    // CORRECTED: Get most recent Annual data (financials are ordered by recency)
-    // financials[0] is actually the most recent, not interim data
     let latestAnnual = null;
     for (let i = 0; i < financials.length; i++) {
       if (financials[i].Type === 'Annual') {
@@ -389,10 +383,8 @@ async function generateDetailedEnglishAnalysis(stockData) {
       industry,
     } = stockData;
 
-    // CHANGE 1: Use new function instead of extractKeyMetrics
-    const metrics = stockData.metrics; // <- Only this line changed
+    const metrics = stockData.metrics;
 
-    // Calculate price position (unchanged)
     let priceFromHigh = '';
     if (currentPrice && yearHigh) {
       const dropPercent = Math.round(
@@ -545,7 +537,6 @@ async function analyzeStocks(input, language = 'hindi') {
   console.log(`📝 Input: "${input}"`);
   console.log(`🗣️ Language: ${language}`);
 
-  // Parse input - handle multiple stocks
   const stockNames = input.split(',').map(s => s.trim()).filter(name => name.length > 0);
   const results = [];
 
@@ -554,7 +545,6 @@ async function analyzeStocks(input, language = 'hindi') {
   for (const stockName of stockNames) {
     console.log(`\nFetching data for: ${stockName}`);
 
-    // Fetch stock data
     const stockData = await fetchStockData(stockName);
 
     if (!stockData.success) {
@@ -565,7 +555,6 @@ async function analyzeStocks(input, language = 'hindi') {
       continue;
     }
 
-    // STEP 1: Always generate English analysis first
     console.log(`Generating English analysis for: ${stockData.companyName}`);
     const englishAnalysis = await generateDetailedEnglishAnalysis(stockData);
 
@@ -575,7 +564,6 @@ async function analyzeStocks(input, language = 'hindi') {
       // Return English analysis as-is
       finalAnalysis = englishAnalysis;
     } else {
-      // STEP 2: Translate English to Hindi
       console.log(`Translating to Hindi for: ${stockData.companyName}`);
       finalAnalysis = await translateToHindi(englishAnalysis);
     }
@@ -596,10 +584,6 @@ async function analyzeStocks(input, language = 'hindi') {
   return results.join('\n\n---\n\n');
 }
 
-// Backward compatibility - if no language specified, default to Hindi
-const originalAnalyzeStocks = analyzeStocks;
-
-// Command line interface
 async function main() {
   const input = process.argv[2];
   const language = process.argv[3] || 'hindi';

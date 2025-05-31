@@ -1,7 +1,3 @@
-// whatsapp-bot-server.js
-// WhatsApp Stock Bot Server with Meta WhatsApp Business Cloud API
-// Updated from Twilio to Meta API integration
-
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');

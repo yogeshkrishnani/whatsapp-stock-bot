@@ -1,6 +1,3 @@
-// user-manager.js
-// SQLite-based user state management for WhatsApp Stock Bot
-
 const sqlite3 = require('sqlite3').verbose();
 
 class UserManager {

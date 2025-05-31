@@ -546,7 +546,7 @@ async function analyzeStocks(input, language = 'hindi') {
   console.log(`🗣️ Language: ${language}`);
 
   // Parse input - handle multiple stocks
-  const stockNames = input.split(/[,\s]+/).filter(name => name.length > 0);
+  const stockNames = input.split(',').map(s => s.trim()).filter(name => name.length > 0);
   const results = [];
 
   console.log(`\n🔍 Analyzing ${stockNames.length} stock(s)...`);

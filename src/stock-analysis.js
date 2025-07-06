@@ -748,7 +748,9 @@ async function analyzeStocks(input, language = 'hindi') {
   // Add disclaimer in appropriate language
   const disclaimer = language === 'english'
     ? '\n⚠️ This is information only, not investment advice.'
-    : '\n⚠️ यह सिर्फ जानकारी है, निवेश सलाह नहीं है।';
+    : language === 'hindi'
+      ? '\n⚠️ यह सिर्फ जानकारी है, निवेश सलाह नहीं है।'
+      : '\n⚠️ આ માત્ર માહિતી છે, રોકાણની સલાહ નથી.';
 
   results.push(disclaimer);
 

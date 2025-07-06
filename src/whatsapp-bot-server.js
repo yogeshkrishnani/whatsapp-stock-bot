@@ -295,12 +295,16 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
       errorMessage =
           userLanguage === 'english'
             ? 'Unable to fetch stock data. Please try again later.'
-            : 'स्टॉक डेटा प्राप्त करने में समस्या हुई। कृपया बाद में कोशिश करें।';
+            : userLanguage === 'hindi'
+              ? 'स्टॉक डेटा प्राप्त करने में समस्या हुई। कृपया बाद में कोशिश करें।'
+              : 'સ્ટોક ડેટા મેળવવામાં સમસ્યા થઈ. કૃપા કરીને પછીથી પ્રયાસ કરો.';
     } else if (error.message && error.message.includes('OpenAI')) {
       errorMessage =
           userLanguage === 'english'
             ? 'Analysis service is experiencing issues. Please try again later.'
-            : 'विश्लेषण सेवा में समस्या है। कृपया बाद में कोशिश करें।';
+            : userLanguage === 'hindi'
+              ? 'विश्लेषण सेवा में समस्या है। कृपया बाद में कोशिष करें।'
+              : 'વિશ્લેષણ સેવામાં સમસ્યા છે. કૃપા કરીને પછીથી પ્રયાસ કરો.';
     }
 
     posthog.capture({

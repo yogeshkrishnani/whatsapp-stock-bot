@@ -521,6 +521,11 @@ async function startServer() {
           process.env.POSTHOG_API_KEY ? '✅ Set' : '❌ Missing'
         }`
       );
+      console.log(
+        `• SARVAM_API_KEY: ${
+          process.env.SARVAM_API_KEY ? '✅ Set' : '❌ Missing'
+        }`
+      );
       console.log('---');
       console.log('⏳ Ready for multi-language stock analysis via Meta WhatsApp API...');
     });

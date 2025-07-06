@@ -185,7 +185,7 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
       );
       posthog.capture({
         distinctId: fromNumber,
-        event: languageResult.language === 'english' ? 'language_set_english' : 'language_set_hindi',
+        event: languageResult.language === 'english' ? 'language_set_english' : languageResult.language === 'hindi' ? 'language_set_hindi' : 'language_set_gujarati',
         properties: {
           language: languageResult.language,
         }
@@ -220,7 +220,9 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
       const emptyMessage =
           userLanguage === 'english'
             ? 'Please send a stock name. Example: TCS or Reliance'
-            : 'कृपया स्टॉक का नाम भेजें। जैसे: TCS या Reliance';
+            : userLanguage === 'hindi'
+              ? 'कृपया स्टॉक का नाम भेजें। जैसे: TCS या Reliance'
+              : 'કૃપા કરીને સ્ટોકનું નામ મોકલો. ઉદાહરણ: TCS અથવા Reliance';
       await sendMetaWhatsAppMessage(emptyMessage, fromNumber);
       return;
     }

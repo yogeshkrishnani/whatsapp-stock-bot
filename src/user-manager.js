@@ -128,7 +128,7 @@ class UserManager {
   // Check if message is a language command
   isLanguageCommand(message) {
     const cleanMessage = message.trim().toLowerCase();
-    const languageCommands = ['english', 'hindi', 'eng', 'hin'];
+    const languageCommands = ['english', 'hindi', 'gujarati', 'eng', 'hin', 'guj'];
     return languageCommands.includes(cleanMessage);
   }
 
@@ -207,7 +207,7 @@ class UserManager {
       return {
         isLanguageCommand: false,
         needsLanguagePreference: true,
-        message: 'Welcome! Please choose your language: English or Hindi'
+        message: 'Welcome! Please choose your language: English, Hindi or Gujarati'
       };
     }
   }

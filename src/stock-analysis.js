@@ -641,6 +641,61 @@ ${englishAnalysis}
   }
 }
 
+async function translateToGujarati(englishAnalysis) {
+  try {
+    const translationPrompt = `
+Translate this English stock analysis to conversational Gujarati for 60+ Indian retail investors:
+
+IMPORTANT: Keep total response under 1500 characters including all formatting.
+
+PRESERVE EXACTLY:
+- All WhatsApp formatting: *bold text*, symbols ✅⚠️❌
+- All numbers, percentages, ₹ amounts
+- Line breaks and bullet structure
+- Company names and technical terms in parentheses
+- Do not add, remove, or reflow any punctuation, numbers, or symbols
+LANGUAGE STYLE:
+- Use simple, conversational Gujarati (not pure/formal Gujarati)
+- Mix in common English finance words sparingly
+- For any finance term not listed below, either leave it in English or add a brief Gujarati parenthetical
+SPECIFIC TRANSLATIONS:  
+- "Market Cap" → "કંપનીનું મૂલ્ય"    
+- "Debt" → "કર્જ"    
+- "Revenue" → "આવક"    
+- "Profit" → "નફો"    
+- "Risk" → "જોખમ"
+- "Growth" → "વધારો"
+  
+MAINTAIN STRUCTURE:
+- Same headings/bullets in same order  
+- Same recommendation logic and symbols (✅⚠️❌)
+EXAMPLE:
+"Market Cap of ₹5000cr" → "કંપનીનું કદ ₹5000 કરોડ"
+CRITICAL:
+- સલાહ: 👉 ખરીદો/રોકો/વેચો – [મુખ્ય આંકડાઓ સાથે સંક્ષિપ્ત તર્ક]
+NOTE: Replace \`${englishAnalysis}\` with the actual analysis text—do not include the placeholder.
+  
+English Analysis to Translate:
+${englishAnalysis}
+`;
+
+    console.log({translationPrompt});
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: translationPrompt }],
+      max_tokens: 800,
+      temperature: 0.2, // Lower temperature for more consistent translation
+    });
+
+    return completion.choices[0].message.content.trim();
+  } catch (error) {
+    console.error('Error translating to Gujarati:', error.message);
+    // Fallback: Return a simple Hindi error message
+    return 'જાણકારીના અનુવાદમાં ભૂલ થઈ છે. કૃપા કરીને પછી પ્રયાસ કરો.\n\n⚠️ આ માત્ર માહિતી છે, નિવેશ સલાહ નથી.';
+  }
+}
+
 // Main analysis function with language support
 async function analyzeStocks(input, language = 'hindi') {
   console.log('\n🚀 Starting Detailed Stock Analysis...');
@@ -660,7 +715,9 @@ async function analyzeStocks(input, language = 'hindi') {
     if (!stockData.success) {
       const errorMsg = language === 'english'
         ? `❌ ${stockName}: Stock not found. Please check the name.`
-        : `❌ ${stockName}: स्टॉक नहीं मिला। सही नाम लिखें।`;
+        : language === 'hindi'
+          ? `❌ ${stockName}: स्टॉक नहीं मिला। सही नाम लिखें।`
+          : `❌ ${stockName}: સ્ટોક મળ્યો નથી. સાચું નામ લખો.`;
       results.push(errorMsg);
       continue;
     }
@@ -673,6 +730,10 @@ async function analyzeStocks(input, language = 'hindi') {
     if (language === 'english') {
       // Return English analysis as-is
       finalAnalysis = englishAnalysis;
+    } else if (language === 'hindi') {
+      finalAnalysis = await translateToHindi(englishAnalysis);
+    } else if (language === 'gujarati') {
+      finalAnalysis = await translateToGujarati(englishAnalysis);
     } else {
       console.log(`Translating to Hindi for: ${stockData.companyName}`);
       finalAnalysis = await translateToHindi(englishAnalysis);

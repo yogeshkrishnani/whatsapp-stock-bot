@@ -650,7 +650,8 @@ async function translateToGujarati(englishAnalysis) {
       target_language_code: 'gu-IN',
       speaker_gender: 'Male',
       model: 'sarvam-translate:v1',
-      enable_preprocessing: true
+      enable_preprocessing: false,  // Try turning this OFF
+      output_script: null,          // Ensure no script conversion
     });
 
     console.log('✅ Sarvam AI Gujarati translation successful');

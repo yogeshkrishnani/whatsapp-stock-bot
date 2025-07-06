@@ -142,6 +142,9 @@ class UserManager {
     if (['hindi', 'hin'].includes(cleanMessage)) {
       return 'hindi';
     }
+    if (['gujarati', 'guj'].includes(cleanMessage)) {
+      return 'gujarati';
+    }
     return null;
   }
 
@@ -181,7 +184,9 @@ class UserManager {
             language: language,
             message: language === 'english'
               ? 'Language set to English! Send any stock name for analysis.'
-              : 'भाषा हिंदी सेट कर दी गई! विश्लेषण के लिए कोई भी स्टॉक का नाम भेजें।'
+              : language === 'hindi'
+                ? 'भाषा हिंदी सेट कर दी गई! विश्लेषण के लिए कोई भी स्टॉक का नाम भेजें।'
+                : 'ભાષા ગુજરાતી સેટ કરવામાં આવી! વિશ્લેષણ માટે કોઈપણ સ્ટોકનું નામ મોકલો.'
           };
         }
       }
@@ -220,6 +225,7 @@ class UserManager {
           COUNT(*) as total_users,
           SUM(CASE WHEN language_preference = 'english' THEN 1 ELSE 0 END) as english_users,
           SUM(CASE WHEN language_preference = 'hindi' THEN 1 ELSE 0 END) as hindi_users,
+          SUM(CASE WHEN language_preference = 'gujarati' THEN 1 ELSE 0 END) as gujarati_users,
           SUM(CASE WHEN language_preference = 'pending' THEN 1 ELSE 0 END) as pending_users,
           SUM(message_count) as total_messages
         FROM users

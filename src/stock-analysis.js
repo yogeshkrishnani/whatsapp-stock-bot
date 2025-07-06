@@ -23,6 +23,88 @@ function findFinancialItem(financialArray, keyName) {
   return null;
 }
 
+function extractAnalystData(stockData) {
+  const analystData = {
+    hasAnalysts: false,
+    ratings: [], // Array of all active ratings
+    totalAnalysts: 0,
+    riskLevel: null,
+    volatility: null
+  };
+
+  try {
+    if (stockData.analystView && Array.isArray(stockData.analystView)) {
+
+      // Get total analyst count
+      const totalEntry = stockData.analystView.find(item => item.ratingName === 'Total');
+      if (totalEntry && parseInt(totalEntry.numberOfAnalystsLatest) > 0) {
+        analystData.hasAnalysts = true;
+        analystData.totalAnalysts = parseInt(totalEntry.numberOfAnalystsLatest);
+
+        // Get all ratings with analysts > 0
+        const activeRatings = stockData.analystView
+          .filter(item =>
+            item.ratingName !== 'Total' &&
+                parseFloat(item.numberOfAnalystsLatest) > 0
+          )
+          .map(item => ({
+            rating: item.ratingName,
+            count: parseInt(item.numberOfAnalystsLatest),
+            value: item.ratingValue
+          }));
+
+        analystData.ratings = activeRatings;
+      }
+    }
+
+    // Risk data extraction (unchanged)
+    if (stockData.riskMeter) {
+      analystData.riskLevel = stockData.riskMeter.categoryName;
+      analystData.volatility = parseFloat(stockData.riskMeter.stdDev);
+    }
+
+    console.log('📊 Enhanced Analyst Data:');
+    console.log(`   Total Analysts: ${analystData.totalAnalysts}`);
+    console.log('   Active Ratings:', analystData.ratings);
+  } catch (error) {
+    console.error('Error extracting analyst data:', error.message);
+  }
+
+  return analystData;
+}
+
+// Extract recent news headlines
+function extractRecentNews(stockData) {
+  const newsData = {
+    hasNews: false,
+    headlines: []
+  };
+
+  try {
+    if (stockData.recentNews && Array.isArray(stockData.recentNews) && stockData.recentNews.length > 0) {
+      newsData.hasNews = true;
+
+      // Get top 2 most recent news items
+      newsData.headlines = stockData.recentNews
+        .slice(0, 2)
+        .map(news => ({
+          headline: news.headline,
+          date: news.date,
+          intro: news.intro
+        }));
+    }
+
+    console.log('📰 Recent News Extracted:');
+    console.log(`   Has News: ${newsData.hasNews}`);
+    console.log(`   Headlines: ${newsData.headlines.length} items`);
+
+  } catch (error) {
+    console.error('Error extracting news data:', error.message);
+  }
+
+  return newsData;
+}
+
 // New function to prepare 3-year historical financial data and risk assessment
 function prepareHistoricalFinancialData(stockData) {
   const historicalData = {
@@ -178,6 +260,11 @@ function extractKeyMetricsWithHistory(stockData) {
   // Add historical analysis
   const historicalData = prepareHistoricalFinancialData(stockData);
 
+  // Extract analyst recommendations
+  const analystData = extractAnalystData(stockData);
+
+  const newsData = extractRecentNews(stockData);
+
   // Populate the existing placeholder fields that were showing N/A
   metrics.revenueGrowth = historicalData.revenueGrowth;
   metrics.epsGrowth = historicalData.epsGrowth;
@@ -185,6 +272,11 @@ function extractKeyMetricsWithHistory(stockData) {
   // Add risk assessment to metrics
   metrics.riskLevel = historicalData.riskLevel;
   metrics.volatilityScore = historicalData.volatilityScore;
+
+  // Add analyst data to metrics
+  metrics.analystData = analystData;
+
+  metrics.newsData = newsData;
 
   // Add context for AI prompt
   metrics.historicalContext = historicalData.contextSummary;
@@ -401,13 +493,14 @@ IMPORTANT: Keep total response under 1600 characters including all formatting.
 — SYMBOL DEFINITIONS (use **only** these)** —  
 • ✅ if the metric is genuinely POSITIVE (e.g., profits ↑, margins healthy, low debt, valuation attractive)  
 • ⚠️ if the metric is NEUTRAL/MIXED (e.g., fair valuation, moderate concerns, small declines, P/E above 30)  
-• ❌ if the metric is genuinely NEGATIVE (e.g., losses, declining revenue, high debt, expensive valuation)  
+• ❌ if the metric is genuinely NEGATIVE (e.g., losses, declining revenue, high debt, expensive valuation, negative analyst recommendation)  
 • If a company has losses or declining revenue, ALWAYS use ❌ for Year-on-Year Profits.
 • If a company has severe issues (negative margins, financial instability), ALWAYS use ❌ for Risks & Challenges.
 
 — Guidelines:
 - P/E ratio above 30 is generally considered high, but can be acceptable for growth stocks.
 - Provide Buy Recommendation, If the company is fundamentally strong but valuation is high.
+- Consider recent news impact on stock sentiment.
 - Use simple English suitable for retail investors
 - Include actual financial numbers wherever possible
 - Be specific about percentages, amounts, and market cap in crores
@@ -444,6 +537,19 @@ Financial Metrics:
 | Revenue Growth      | ${metrics.revenueGrowth || 'N/A'}%    |
 | EPS Growth          | ${metrics.epsGrowth || 'N/A'}%        |
 
+Analyst Data:
+| Analyst Info        | Value                                 |
+|---------------------|---------------------------------------|
+| Total Analysts      | ${metrics.analystData?.totalAnalysts || 0} analysts |
+| All Ratings         | ${metrics.analystData?.ratings?.map(r => `${r.count} ${r.rating}`).join(', ') || 'None'} |
+| Risk Level          | ${metrics.analystData?.riskLevel || 'Unknown'} |
+| Volatility          | ${metrics.analystData?.volatility || 'N/A'}% |
+
+Recent News:
+| News Info           | Value                                 |
+|---------------------|---------------------------------------|
+| Latest Headlines    | ${metrics.newsData?.hasNews ? metrics.newsData.headlines.map(h => h.headline.substring(0, 60) + '...').join(' | ') : 'No recent news'} |
+
 — YOUR TASK — 
 
 Create analysis in this EXACT format:
@@ -454,7 +560,11 @@ Create analysis in this EXACT format:
 ✅/⚠️/❌ *Current Price:* [Current price with 52-week high and 52-week low and price position]
 ✅/⚠️/❌ *Year-on-Year Profits:* [${metrics.historicalContext || 'Profit trends with specific revenue and growth numbers'}]
 ✅/⚠️/❌ *Price vs Earnings (P/E):* [P/E analysis with actual ratio and valuation assessment]
+${metrics.analystData?.hasAnalysts ?
+    `✅/⚠️/❌ *Expert Opinion:* ${metrics.analystData.totalAnalysts} analyst${metrics.analystData.totalAnalysts > 1 ? 's' : ''} - ${metrics.analystData.ratings?.map(r => `${r.count} ${r.rating}`).join(', ')}` :
+    '⚠️ *Expert Opinion:* No analyst coverage available'}
 ✅/⚠️/❌ *Risks & Challenges:* [Specific business/market risks with debt levels and ${metrics.riskLevel} volatility risk]
+✅/⚠️/❌ *Recent News:* [Summarize recent news headlines and their impact on the stock]
 
 *Summary:* [2-3 line summary of overall investment situation]
 

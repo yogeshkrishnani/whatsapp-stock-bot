@@ -231,7 +231,9 @@ async function processMessageWithLanguageSupport(messageBody, fromNumber) {
     const acknowledgmentMessage =
         userLanguage === 'english'
           ? '📊 Analyzing stocks... Please wait 30 seconds'
-          : '📊 विश्लेषण कर रहे हैं... कृपया 30 सेकंड रुकें';
+          : userLanguage === 'hindi'
+            ? '📊 विश्लेषण कर रहे हैं... कृपया 30 सेकंड रुकें'
+            : '📊 અમે ચેક કરી રહ્યા છીએ... કૃપા કરીને થોડી વાર રાહ જુઓ';
 
     await sendMetaWhatsAppMessage(acknowledgmentMessage, fromNumber);
 

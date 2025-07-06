@@ -1,11 +1,16 @@
 const axios = require('axios');
 const OpenAI = require('openai');
 const https = require('https');
+const { SarvamAIClient } = require('sarvamai');
 require('dotenv').config();
 
 // Initialize OpenAI
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+});
+
+const sarvamClient = new SarvamAIClient({
+  apiSubscriptionKey: process.env.SARVAM_API_KEY,
 });
 
 // IndianAPI.in configuration via RapidAPI
@@ -62,10 +67,6 @@ function extractAnalystData(stockData) {
       analystData.riskLevel = stockData.riskMeter.categoryName;
       analystData.volatility = parseFloat(stockData.riskMeter.stdDev);
     }
-
-    console.log('📊 Enhanced Analyst Data:');
-    console.log(`   Total Analysts: ${analystData.totalAnalysts}`);
-    console.log('   Active Ratings:', analystData.ratings);
   } catch (error) {
     console.error('Error extracting analyst data:', error.message);
   }
@@ -93,11 +94,6 @@ function extractRecentNews(stockData) {
           intro: news.intro
         }));
     }
-
-    console.log('📰 Recent News Extracted:');
-    console.log(`   Has News: ${newsData.hasNews}`);
-    console.log(`   Headlines: ${newsData.headlines.length} items`);
-
   } catch (error) {
     console.error('Error extracting news data:', error.message);
   }
@@ -124,12 +120,6 @@ function prepareHistoricalFinancialData(stockData) {
   };
 
   try {
-    // Debug: Check what data structure we have
-    console.log('🔍 Checking stockData structure:');
-    console.log(`   Has financials: ${!!stockData.financials}`);
-    console.log(`   Financials type: ${typeof stockData.financials}`);
-    console.log(`   Financials length: ${stockData.financials?.length || 'N/A'}`);
-
     // Check if financials data exists
     if (!stockData.financials || !Array.isArray(stockData.financials)) {
       console.log('⚠️ No financials data available for historical analysis');
@@ -237,12 +227,6 @@ function prepareHistoricalFinancialData(stockData) {
         historicalData.contextSummary = `Revenue ${revenueChange > 0 ? 'up' : 'down'} ${Math.abs(revenueChange).toFixed(1)}% to ₹${current.revenue} crores, ${trendDescription} with profit ${profitGrowth > 0 ? 'growth' : 'decline'} of ${profitGrowth.toFixed(1)}%`;
       }
     }
-
-    console.log('📊 Historical Financial Analysis:');
-    console.log(`   Revenue Growth YoY: ${historicalData.revenueGrowth}%`);
-    console.log(`   EPS Growth YoY: ${historicalData.epsGrowth}%`);
-    console.log(`   Risk Level: ${historicalData.riskLevel} (Volatility: ${historicalData.volatilityScore.toFixed(1)})`);
-    console.log(`   Context: ${historicalData.contextSummary}`);
 
     return historicalData;
 
@@ -396,14 +380,6 @@ function extractKeyMetrics(stockData) {
     metrics.yearHigh = parseFloat(stockData.yearHigh) || null;
     metrics.yearLow = parseFloat(stockData.yearLow) || null;
     metrics.percentChange = parseFloat(stockData.percentChange) || 0;
-
-    console.log('✅ Extracted metrics from FINANCIALS section (accurate data)');
-    console.log(`   Revenue: ₹${metrics.revenue} crores (vs keyMetrics inflated data)`);
-    console.log(`   Net Income: ₹${metrics.netIncome} crores (vs keyMetrics inflated data)`);
-    console.log(`   Net Margin: ${metrics.netProfitMargin?.toFixed(1)}%`);
-    console.log(`   ROE: ${metrics.roe?.toFixed(1)}%`);
-    console.log(`   Debt/Equity: ${metrics.debtToEquity?.toFixed(2)}`);
-
   } catch (error) {
     console.error('Error extracting metrics from financials:', error.message);
   }
@@ -593,6 +569,29 @@ ${metrics.analystData?.hasAnalysts ?
 
 async function translateToHindi(englishAnalysis) {
   try {
+    console.log('🔄 Translating to Hindi using Sarvam AI...');
+
+    const response = await sarvamClient.text.translate({
+      input: englishAnalysis,
+      source_language_code: 'en-IN',
+      target_language_code: 'hi-IN',
+      speaker_gender: 'Male',
+      model: 'sarvam-translate:v1',
+      enable_preprocessing: true
+    });
+
+    console.log('✅ Sarvam AI Hindi translation successful');
+    return response.translated_text;
+
+  } catch (error) {
+    console.warn('⚠️ Sarvam AI Hindi translation failed, falling back to OpenAI:', error);
+    // Fallback to your existing OpenAI translation
+    return await translateToHindiOpenAI(englishAnalysis);
+  }
+}
+
+async function translateToHindiOpenAI(englishAnalysis) {
+  try {
     const translationPrompt = `
 Translate this English stock analysis to conversational Hindi for 60+ Indian retail investors:
 
@@ -643,6 +642,30 @@ ${englishAnalysis}
 
 async function translateToGujarati(englishAnalysis) {
   try {
+    console.log('🔄 Translating to Gujarati using Sarvam AI...');
+
+    const response = await sarvamClient.text.translate({
+      input: englishAnalysis,
+      source_language_code: 'en-IN',
+      target_language_code: 'gu-IN',
+      speaker_gender: 'Male',
+      model: 'sarvam-translate:v1',
+      enable_preprocessing: true
+    });
+
+    console.log('✅ Sarvam AI Gujarati translation successful');
+    return response.translated_text;
+
+  } catch (error) {
+    console.error('Error translating to Gujarati:', error);
+    console.warn('⚠️ Sarvam AI Gujarati translation failed, falling back to OpenAI:', error.message);
+    // Fallback to your existing OpenAI translation
+    return await translateToGujaratiOpenAI(englishAnalysis);
+  }
+}
+
+async function translateToGujaratiOpenAI(englishAnalysis) {
+  try {
     const translationPrompt = `
 Translate this English stock analysis to conversational Gujarati for 60+ Indian retail investors:
 
@@ -678,8 +701,6 @@ NOTE: Replace \`${englishAnalysis}\` with the actual analysis text—do not incl
 English Analysis to Translate:
 ${englishAnalysis}
 `;
-
-    console.log({translationPrompt});
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
